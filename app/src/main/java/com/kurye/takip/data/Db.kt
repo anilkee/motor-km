@@ -379,6 +379,90 @@ class Repo(context: Context) {
         return Consumption(km, litre, tutar, adet)
     }
 
+    // ---------------------------------------------------------- disa aktar
+
+    /**
+     * Tum veriyi JSON olarak yazar.
+     *
+     * Nokta sayisi yillar icinde yuz binlere cikabilir; bu yuzden once listeye
+     * toplamayip dogrudan imlecten yaziyoruz. Boylece bellek sabit kaliyor.
+     */
+    fun disaktar(y: android.util.JsonWriter, uygulamaSurumu: String) {
+        y.beginObject()
+        y.name("surum").value(1L)
+        y.name("olusturma").value(System.currentTimeMillis())
+        y.name("uygulama").value(uygulamaSurumu)
+
+        y.name("vardiyalar").beginArray()
+        db.rawQuery("SELECT * FROM shifts ORDER BY start_time", null).use { c ->
+            while (c.moveToNext()) {
+                val bitis = c.getColumnIndexOrThrow("end_time")
+                y.beginObject()
+                y.name("id").value(c.getLong(c.getColumnIndexOrThrow("id")))
+                y.name("baslangic").value(c.getLong(c.getColumnIndexOrThrow("start_time")))
+                if (c.isNull(bitis)) y.name("bitis").nullValue() else y.name("bitis").value(c.getLong(bitis))
+                y.name("mesafeM").value(c.getDouble(c.getColumnIndexOrThrow("distance_m")))
+                y.endObject()
+            }
+        }
+        y.endArray()
+
+        y.name("noktalar").beginArray()
+        db.rawQuery("SELECT shift_id, time, lat, lon, speed FROM points ORDER BY shift_id, time", null).use { c ->
+            while (c.moveToNext()) {
+                y.beginObject()
+                y.name("vardiyaId").value(c.getLong(0))
+                y.name("zaman").value(c.getLong(1))
+                y.name("enlem").value(c.getDouble(2))
+                y.name("boylam").value(c.getDouble(3))
+                y.name("hiz").value(c.getDouble(4))
+                y.endObject()
+            }
+        }
+        y.endArray()
+
+        y.name("paketler").beginArray()
+        db.rawQuery("SELECT shift_id, time, lat, lon FROM deliveries ORDER BY time", null).use { c ->
+            while (c.moveToNext()) {
+                y.beginObject()
+                y.name("vardiyaId").value(c.getLong(0))
+                y.name("zaman").value(c.getLong(1))
+                y.name("enlem").value(c.getDouble(2))
+                y.name("boylam").value(c.getDouble(3))
+                y.endObject()
+            }
+        }
+        y.endArray()
+
+        y.name("yakit").beginArray()
+        db.rawQuery("SELECT time, liters, price FROM fuel ORDER BY time", null).use { c ->
+            while (c.moveToNext()) {
+                y.beginObject()
+                y.name("zaman").value(c.getLong(0))
+                y.name("litre").value(c.getDouble(1))
+                y.name("tutar").value(c.getDouble(2))
+                y.endObject()
+            }
+        }
+        y.endArray()
+
+        y.name("bakim").beginArray()
+        db.rawQuery("SELECT ad, son_km, son_tarih, aralik_km, aralik_gun FROM maintenance ORDER BY id", null).use { c ->
+            while (c.moveToNext()) {
+                y.beginObject()
+                y.name("ad").value(c.getString(0))
+                y.name("sonKm").value(c.getDouble(1))
+                y.name("sonTarih").value(c.getLong(2))
+                if (c.isNull(3)) y.name("aralikKm").nullValue() else y.name("aralikKm").value(c.getDouble(3))
+                if (c.isNull(4)) y.name("aralikGun").nullValue() else y.name("aralikGun").value(c.getLong(4))
+                y.endObject()
+            }
+        }
+        y.endArray()
+
+        y.endObject()
+    }
+
     // ------------------------------------------------------------ yardimci
 
     private fun Cursor.toShift() = Shift(

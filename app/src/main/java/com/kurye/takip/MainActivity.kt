@@ -59,6 +59,7 @@ import com.kurye.takip.ui.SummaryScreen
 import com.kurye.takip.update.CheckResult
 import com.kurye.takip.update.UpdateInfo
 import com.kurye.takip.update.Updater
+import com.kurye.takip.sync.Yedekleyici
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -165,6 +166,11 @@ fun AppRoot(repo: Repo, prefs: Prefs) {
         if (repo.activeShift() != null && konumIzniVar(ctx)) {
             TrackingService.start(ctx, null)
         }
+    }
+
+    // Acilista sessiz yedekleme (gunde bir kez, sessizce).
+    LaunchedEffect(Unit) {
+        Yedekleyici.gerekiyorsaYedekle(ctx)
     }
 
     // Acilista sessiz guncelleme kontrolu.

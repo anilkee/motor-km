@@ -122,6 +122,45 @@ tüketim** çıkar.
 
 ---
 
+## Web paneli ve yedekleme
+
+**Panel:** https://eve-gitmem-gerek-heryerdeyim.duckdns.org
+
+Telefondaki kayıtların sunucuya kopyalanır. İki işe yarar:
+
+1. **Yedek** — telefon kaybolur, çalınır ya da bozulursa kayıtların durur.
+2. **Panel** — bilgisayardan girip raporlara, tüm rotaları tek haritada ve
+   Excel'e aktarmaya erişirsin. Telefon ekranında zor olan işler.
+
+### Telefonda ayarı
+**Ayarlar → Sunucu yedeği** bölümüne adresi ve cihaz anahtarını bir kez gir.
+Sonrasında günde bir kez kendi kendine yedekler; istediğinde **Şimdi yedekle**
+ile elle de yollayabilirsin.
+
+Veri gzip'lenerek gönderilir, mobil veriden yemez.
+
+### Panelde neler var
+| Sayfa | İçerik |
+|---|---|
+| Özet | Km, paket, süre, yakıt tüketimi, gün gün kırılım |
+| Vardiyalar | Tüm vardiyalar; birine tıklayınca o günün rotası haritada |
+| Harita | Bütün rotalar tek haritada, paket bıraktığın yerler |
+| Yakıt | Dolum geçmişi ve litre fiyatları |
+
+Sağ üstteki **CSV indir** ile Excel'e açılabilir dosya alırsın.
+
+### Sunucu tarafı nasıl kurulu
+- `C:\KuryePanel\sunucu.js` — Node.js, sadece 127.0.0.1:3000'i dinler
+- `C:\KuryePanel\caddy.exe` — 80/443, Let's Encrypt sertifikasını otomatik yeniler
+- İkisi de **Görev Zamanlayıcı**'da kayıtlı, sunucu yeniden başlayınca kendi kalkar
+  (`KuryePanel-Node`, `KuryePanel-Caddy`)
+- Şifreler `C:\KuryePanel\ayarlar.json` içinde; panel şifresi düz değil,
+  scrypt özeti olarak saklanır
+- Yedekler `C:\KuryePanel\yedek\` — son hali `son.json`, arşivde son 60 kopya
+
+Sunucuda çalışan diğer projelerine (ChatServer, ClaimServer, NexoraBot,
+IdResponder) dokunulmadı.
+
 ## Güncelleme yayınlama
 
 Depo: **https://github.com/anilkee/motor-km**

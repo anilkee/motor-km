@@ -1,0 +1,22 @@
+{
+	admin off
+}
+
+eve-gitmem-gerek-heryerdeyim.duckdns.org {
+	encode gzip
+	request_body {
+		max_size 50MB
+	}
+	reverse_proxy 127.0.0.1:3000 {
+		transport http {
+			read_timeout 120s
+			write_timeout 120s
+		}
+	}
+	log {
+		output file C:/KuryePanel/caddy.log {
+			roll_size 10MB
+			roll_keep 3
+		}
+	}
+}

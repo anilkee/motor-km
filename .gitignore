@@ -22,3 +22,6 @@ keystore.properties
 
 # --- Uretilen APK'lar (GitHub Releases uzerinden dagitilir) ---
 yayin/*.apk
+
+# --- Sunucu sirlari: asla depoya girmez ---
+sunucu/ayarlar.json

@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +44,8 @@ import com.kurye.takip.Prefs
 import com.kurye.takip.update.CheckResult
 import com.kurye.takip.update.UpdateInfo
 import com.kurye.takip.update.Updater
+import com.kurye.takip.sync.YedekSonuc
+import com.kurye.takip.sync.Yedekleyici
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -65,6 +68,13 @@ fun SettingsScreen(
     var indiriliyor by remember { mutableStateOf(false) }
     var ilerleme by remember { mutableFloatStateOf(0f) }
     var indirilenDosya by remember { mutableStateOf<File?>(null) }
+
+    var sunucuAdres by remember { mutableStateOf(prefs.sunucuAdresi) }
+    var cihazAnahtar by remember { mutableStateOf(prefs.cihazAnahtari) }
+    var otoYedek by remember { mutableStateOf(prefs.otoYedek) }
+    var yedekleniyor by remember { mutableStateOf(false) }
+    var yedekMesaj by remember { mutableStateOf<String?>(null) }
+    var yedekHata by remember { mutableStateOf(false) }
 
     fun kontrolEt() {
         scope.launch {
@@ -251,6 +261,97 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // ------------------------------------------------------ sunucu yedegi
+        SectionCard("Sunucu yedegi") {
+            Text(
+                "Kayitlarin sunucuya kopyalanir. Telefon kaybolursa veriler durur, " +
+                    "ayrica bilgisayardan panele girip raporlara bakabilirsin.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = sunucuAdres,
+                onValueChange = { sunucuAdres = it; prefs.sunucuAdresi = it },
+                label = { Text("Sunucu adresi") },
+                placeholder = { Text("https://...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = cihazAnahtar,
+                onValueChange = { cihazAnahtar = it; prefs.cihazAnahtari = it },
+                label = { Text("Cihaz anahtari") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Gunde bir kez kendi yedeklesin", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (prefs.sonYedek > 0) "Son yedek: ${tarihSaat(prefs.sonYedek)}"
+                        else "Henuz yedek alinmadi",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = otoYedek,
+                    onCheckedChange = { otoYedek = it; prefs.otoYedek = it }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        yedekleniyor = true
+                        yedekMesaj = null
+                        when (val s = Yedekleyici.yedekle(ctx)) {
+                            is YedekSonuc.Tamam -> {
+                                yedekMesaj = "Yedeklendi: ${s.vardiya} vardiya, ${s.paket} paket, " +
+                                    "${s.yakit} dolum, ${s.nokta} konum"
+                                yedekHata = false
+                            }
+                            YedekSonuc.AyarYok -> {
+                                yedekMesaj = "Once adres ve anahtari gir."
+                                yedekHata = true
+                            }
+                            is YedekSonuc.Hata -> {
+                                yedekMesaj = "Olmadi: ${s.mesaj}"
+                                yedekHata = true
+                            }
+                        }
+                        yedekleniyor = false
+                    }
+                },
+                enabled = !yedekleniyor,
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Icon(Icons.Filled.CloudUpload, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(if (yedekleniyor) "Gonderiliyor..." else "Simdi yedekle")
+            }
+
+            if (yedekleniyor) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            yedekMesaj?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (yedekHata) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary
+                )
             }
         }
 

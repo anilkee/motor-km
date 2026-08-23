@@ -40,6 +40,28 @@ class Prefs(context: Context) {
         get() = sp.getInt("skipped", 0)
         set(v) = sp.edit().putInt("skipped", v).apply()
 
+    // ------------------------------------------------------- sunucu yedegi
+
+    /** Panel adresi, ornek: https://xxx.duckdns.org */
+    var sunucuAdresi: String
+        get() = sp.getString("sunucu_adres", "") ?: ""
+        set(v) = sp.edit().putString("sunucu_adres", v.trim()).apply()
+
+    /** Sunucunun verdigi cihaz anahtari. */
+    var cihazAnahtari: String
+        get() = sp.getString("cihaz_anahtari", "") ?: ""
+        set(v) = sp.edit().putString("cihaz_anahtari", v.trim()).apply()
+
+    /** Gunde bir kez kendiliginden yedeklensin mi. */
+    var otoYedek: Boolean
+        get() = sp.getBoolean("oto_yedek", true)
+        set(v) = sp.edit().putBoolean("oto_yedek", v).apply()
+
+    /** Son basarili yedegin zamani. */
+    var sonYedek: Long
+        get() = sp.getLong("son_yedek", 0L)
+        set(v) = sp.edit().putLong("son_yedek", v).apply()
+
     /** Yakit ekranindaki son litre fiyati - yeni kayitta on dolgu icin. */
     var lastLiterPrice: Float
         get() = sp.getFloat("last_liter_price", 0f)

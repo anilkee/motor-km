@@ -1,6 +1,6 @@
 {
-    "versionCode":  5,
-    "versionName":  "1.4",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.4/eve-gitmem-gerek-1.4.apk",
-    "notes":  "Guncelleme kontrolu artik GitHub onbellegini beklemiyor, yeni surum aninda gorunuyor."
+    "versionCode":  6,
+    "versionName":  "1.5",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.5/eve-gitmem-gerek-1.5.apk",
+    "notes":  "Sunucu yedegi eklendi: kayitlarin sunucuya kopyalanir, bilgisayardan web panelinden raporlara ve tum rotalara bakabilirsin. Ayarlar \u003e Sunucu yedegi bolumunden adresi ve anahtari gir."
 }
