@@ -131,7 +131,14 @@ $json = [ordered]@{
     apkUrl      = "https://github.com/$repo/releases/download/$etiket/$apkAdi"
     notes       = $Aciklama
 }
-$json | ConvertTo-Json | Out-File -FilePath (Join-Path $yayinDir "guncelleme.json") -Encoding utf8
+# DIKKAT: Out-File -Encoding utf8 dosyanin basina BOM koyar ve Android'in
+# JSONObject'i BOM'lu metni ayristiramaz. BOM'suz yazmak sart.
+$jsonMetin = $json | ConvertTo-Json
+[System.IO.File]::WriteAllText(
+    (Join-Path $yayinDir "guncelleme.json"),
+    $jsonMetin,
+    (New-Object System.Text.UTF8Encoding $false)
+)
 
 # ------------------------------------------------------------- depoya gonder
 Yaz "4/4  Depoya gonderiliyor..." Cyan

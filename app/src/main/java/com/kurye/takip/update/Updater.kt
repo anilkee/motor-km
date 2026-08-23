@@ -49,7 +49,8 @@ object Updater {
     suspend fun check(url: String): CheckResult = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext CheckResult.NotConfigured
         try {
-            val text = httpGet(url)
+            // Dosya UTF-8 BOM ile baslarsa JSONObject ayristiramaz; temizle.
+            val text = httpGet(url).removePrefix("﻿").trim()
             val o = JSONObject(text)
             val info = UpdateInfo(
                 versionCode = o.getInt("versionCode"),

@@ -1,6 +1,6 @@
-﻿{
-    "versionCode":  2,
-    "versionName":  "1.1",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.1/eve-gitmem-gerek-1.1.apk",
-    "notes":  "Harita artik kendi alaninin disina tasmiyor. Yakit tuketimi depodan depoya hesaplaniyor."
+{
+    "versionCode":  3,
+    "versionName":  "1.2",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.2/eve-gitmem-gerek-1.2.apk",
+    "notes":  "Guncelleme dosyasindaki BOM sorunu giderildi."
 }
