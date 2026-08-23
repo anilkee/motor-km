@@ -143,10 +143,23 @@ $jsonMetin = $json | ConvertTo-Json
 # ------------------------------------------------------------- depoya gonder
 Yaz "4/4  Depoya gonderiliyor..." Cyan
 Push-Location $kok
-& git add -A
-& git commit -q -m "Surum $yeniAd - $Aciklama"
-& git push -q origin main
-$pushKod = $LASTEXITCODE
+
+# git uyarilarini (ornegin satir sonu donusumu) stderr'e yazar; PowerShell 5.1
+# bunlari hata sayip betigi durdurur. O yuzden git cagrilarini tolere ediyoruz
+# ve basari/basarisizligi sadece cikis koduna bakarak anliyoruz.
+function Git-Calistir {
+    param([Parameter(ValueFromRemainingArguments = $true)]$Argumanlar)
+    $eski = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & git @Argumanlar 2>&1 | Out-Null
+    $kod = $LASTEXITCODE
+    $ErrorActionPreference = $eski
+    return $kod
+}
+
+Git-Calistir add -A | Out-Null
+Git-Calistir commit -q -m "Surum $yeniAd - $Aciklama" | Out-Null
+$pushKod = Git-Calistir push -q origin main
 Pop-Location
 
 if ($pushKod -ne 0) {

@@ -1,6 +1,6 @@
 {
-    "versionCode":  4,
-    "versionName":  "1.3",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.3/eve-gitmem-gerek-1.3.apk",
-    "notes":  "Paket sayaci eklendi: tek dokunusla say, konumu kaydet, haritada gor. Ana ekran widget\u0027i ve titresimli onay. Bakim hatirlaticilari (yag, zincir, lastik, muayene, sigorta)."
+    "versionCode":  5,
+    "versionName":  "1.4",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.4/eve-gitmem-gerek-1.4.apk",
+    "notes":  "Guncelleme kontrolu artik GitHub onbellegini beklemiyor, yeni surum aninda gorunuyor."
 }

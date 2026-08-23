@@ -49,8 +49,13 @@ object Updater {
     suspend fun check(url: String): CheckResult = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext CheckResult.NotConfigured
         try {
+            // GitHub'in raw sunucusu dosyayi ~5 dakika onbellekte tutuyor;
+            // adrese benzersiz bir parametre ekleyince taze surumu veriyor.
+            val ayrac = if (url.contains("?")) "&" else "?"
+            val istekUrl = "$url${ayrac}_=${System.currentTimeMillis()}"
+
             // Dosya UTF-8 BOM ile baslarsa JSONObject ayristiramaz; temizle.
-            val text = httpGet(url).removePrefix("﻿").trim()
+            val text = httpGet(istekUrl).removePrefix("﻿").trim()
             val o = JSONObject(text)
             val info = UpdateInfo(
                 versionCode = o.getInt("versionCode"),
