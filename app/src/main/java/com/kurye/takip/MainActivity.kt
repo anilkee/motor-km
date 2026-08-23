@@ -59,7 +59,9 @@ import com.kurye.takip.ui.SummaryScreen
 import com.kurye.takip.update.CheckResult
 import com.kurye.takip.update.UpdateInfo
 import com.kurye.takip.update.Updater
+import com.kurye.takip.sync.Hesap
 import com.kurye.takip.sync.Yedekleyici
+import com.kurye.takip.ui.GirisScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,6 +100,13 @@ private fun gpsAcikMi(ctx: Context): Boolean {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot(repo: Repo, prefs: Prefs) {
+    val girisCtx = LocalContext.current
+    var girisYapildi by remember { mutableStateOf(Hesap.girisYapildiMi(girisCtx)) }
+    if (!girisYapildi) {
+        GirisScreen(onGirisTamam = { girisYapildi = true })
+        return
+    }
+
     val ctx = LocalContext.current
     var sekme by remember { mutableIntStateOf(0) }
     var ayarlarAcik by remember { mutableStateOf(false) }
@@ -191,7 +200,7 @@ fun AppRoot(repo: Repo, prefs: Prefs) {
             TopAppBar(
                 title = {
                     Text(
-                        if (ayarlarAcik) "Ayarlar" else "eve gitmem gerek",
+                        if (ayarlarAcik) "Ayarlar" else "Sefer Defteri",
                         maxLines = 1
                     )
                 },
@@ -246,7 +255,11 @@ fun AppRoot(repo: Repo, prefs: Prefs) {
                 .padding(pad)
         ) {
             if (ayarlarAcik) {
-                SettingsScreen(prefs = prefs, otoKontrol = ayarlarOtoKontrol)
+                SettingsScreen(
+                    prefs = prefs,
+                    otoKontrol = ayarlarOtoKontrol,
+                    onCikis = { ayarlarAcik = false; girisYapildi = false }
+                )
             } else {
                 when (sekme) {
                     0 -> HomeScreen(

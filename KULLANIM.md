@@ -1,4 +1,4 @@
-# eve gitmem gerek heryerdeyim
+# Sefer Defteri
 
 Kurye vardiya takip uygulaması. Sabah **BAŞLAT**'a basarsın, akşama kadar kaç km
 yaptığını ve nerelere gittiğini kaydeder. Yakıt aldıkça girersin, kaç km'de kaç
@@ -124,7 +124,7 @@ tüketim** çıkar.
 
 ## Web paneli ve yedekleme
 
-**Panel:** https://eve-gitmem-gerek-heryerdeyim.duckdns.org
+**Panel:** https://sefer-defteri.duckdns.org
 
 Telefondaki kayıtların sunucuya kopyalanır. İki işe yarar:
 

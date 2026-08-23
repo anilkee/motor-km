@@ -44,8 +44,13 @@ class Prefs(context: Context) {
 
     /** Panel adresi, ornek: https://xxx.duckdns.org */
     var sunucuAdresi: String
-        get() = sp.getString("sunucu_adres", "") ?: ""
+        get() = sp.getString("sunucu_adres", VARSAYILAN_SUNUCU) ?: VARSAYILAN_SUNUCU
         set(v) = sp.edit().putString("sunucu_adres", v.trim()).apply()
+
+    /** Giris yapan kullanicinin adi. */
+    var kullaniciAdi: String
+        get() = sp.getString("kullanici_adi", "") ?: ""
+        set(v) = sp.edit().putString("kullanici_adi", v.trim()).apply()
 
     /** Sunucunun verdigi cihaz anahtari. */
     var cihazAnahtari: String
@@ -72,6 +77,9 @@ class Prefs(context: Context) {
          * Guncelleme adresi: "yayinla.ps1" bu dosyayi uretip GitHub'a yollar.
          * Ayarlar ekranindan telefonda da degistirilebilir.
          */
+        /** Panel adresi - kullanici degistirebilir. */
+        const val VARSAYILAN_SUNUCU = "https://sefer-defteri.duckdns.org"
+
         const val DEFAULT_UPDATE_URL =
             "https://raw.githubusercontent.com/anilkee/motor-km/main/yayin/guncelleme.json"
     }

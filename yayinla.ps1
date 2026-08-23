@@ -103,7 +103,7 @@ if (-not (Test-Path $kaynak)) {
     exit 1
 }
 
-$apkAdi = "eve-gitmem-gerek-$yeniAd.apk"
+$apkAdi = "sefer-defteri-$yeniAd.apk"
 $hedef = Join-Path $yayinDir $apkAdi
 Get-ChildItem $yayinDir -Filter "*.apk" | Remove-Item -Force -ErrorAction SilentlyContinue
 Copy-Item $kaynak $hedef -Force

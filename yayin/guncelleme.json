@@ -1,6 +1,6 @@
 {
-    "versionCode":  6,
-    "versionName":  "1.5",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.5/eve-gitmem-gerek-1.5.apk",
-    "notes":  "Sunucu yedegi eklendi: kayitlarin sunucuya kopyalanir, bilgisayardan web panelinden raporlara ve tum rotalara bakabilirsin. Ayarlar \u003e Sunucu yedegi bolumunden adresi ve anahtari gir."
+    "versionCode":  7,
+    "versionName":  "1.6",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.6/sefer-defteri-1.6.apk",
+    "notes":  "Uygulamanin adi Sefer Defteri oldu. Artik kullanici adi + sifre ya da Google ile giris yapiliyor; bir kez girdikten sonra cikis yapana kadar sormaz. Kayitlarin sunucudaki hesabina yedekleniyor, bilgisayardan sefer-defteri.duckdns.org adresinden raporlara ve tum rotalara bakabilirsin."
 }

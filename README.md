@@ -1,4 +1,4 @@
-# eve gitmem gerek heryerdeyim
+# Sefer Defteri
 
 Motokurye için vardiya, kilometre ve yakıt takibi. Sabah **BAŞLAT**'a basarsın,
 gün boyu kaç km yaptığını ve nerelere gittiğini kaydeder; yakıt aldıkça girersin,

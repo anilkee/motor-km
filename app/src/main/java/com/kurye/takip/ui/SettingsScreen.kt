@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +48,7 @@ import com.kurye.takip.update.CheckResult
 import com.kurye.takip.update.UpdateInfo
 import com.kurye.takip.update.Updater
 import com.kurye.takip.sync.YedekSonuc
+import com.kurye.takip.sync.Hesap
 import com.kurye.takip.sync.Yedekleyici
 import kotlinx.coroutines.launch
 import java.io.File
@@ -53,7 +57,8 @@ import java.io.File
 fun SettingsScreen(
     prefs: Prefs,
     modifier: Modifier = Modifier,
-    otoKontrol: Boolean = false
+    otoKontrol: Boolean = false,
+    onCikis: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -75,6 +80,7 @@ fun SettingsScreen(
     var yedekleniyor by remember { mutableStateOf(false) }
     var yedekMesaj by remember { mutableStateOf<String?>(null) }
     var yedekHata by remember { mutableStateOf(false) }
+    var cikisOnayi by remember { mutableStateOf(false) }
 
     fun kontrolEt() {
         scope.launch {
@@ -274,22 +280,8 @@ fun SettingsScreen(
             )
 
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = sunucuAdres,
-                onValueChange = { sunucuAdres = it; prefs.sunucuAdresi = it },
-                label = { Text("Sunucu adresi") },
-                placeholder = { Text("https://...") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = cihazAnahtar,
-                onValueChange = { cihazAnahtar = it; prefs.cihazAnahtari = it },
-                label = { Text("Cihaz anahtari") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            SatirDeger("Hesap", prefs.kullaniciAdi.ifBlank { "-" })
+            SatirDeger("Sunucu", prefs.sunucuAdresi.removePrefix("https://"))
 
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -353,6 +345,25 @@ fun SettingsScreen(
                     else MaterialTheme.colorScheme.primary
                 )
             }
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(14.dp))
+            OutlinedButton(
+                onClick = { cikisOnayi = true },
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Cikis yap")
+            }
+            Text(
+                "Cikis yapmadigin surece bir daha sifre sorulmaz. " +
+                    "Cikinca telefondaki kayitlar silinmez, sadece sunucu baglantisi kesilir.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
 
         // ------------------------------------------------------ pil ayari
@@ -384,7 +395,7 @@ fun SettingsScreen(
 
         // ------------------------------------------------------ hakkinda
         SectionCard("Hakkinda") {
-            SatirDeger("Uygulama", "eve gitmem gerek heryerdeyim")
+            SatirDeger("Uygulama", "Sefer Defteri")
             SatirDeger("Surum", BuildConfig.VERSION_NAME)
             SatirDeger("Harita", "OpenStreetMap")
             Spacer(Modifier.height(6.dp))
@@ -397,4 +408,34 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(24.dp))
     }
+
+    if (cikisOnayi) {
+        CikisOnayi(
+            onIptal = { cikisOnayi = false },
+            onOnay = {
+                cikisOnayi = false
+                Hesap.cikisYap(ctx)
+                onCikis()
+            }
+        )
+    }
+}
+
+@Composable
+private fun CikisOnayi(
+    onIptal: () -> Unit,
+    onOnay: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onIptal,
+        title = { Text("Cikis yapilsin mi?") },
+        text = {
+            Text(
+                "Telefondaki vardiya, yakit ve paket kayitlarin silinmez. " +
+                    "Sadece sunucu baglantisi kesilir; tekrar girmek icin sifren gerekir."
+            )
+        },
+        confirmButton = { TextButton(onClick = onOnay) { Text("Cikis yap") } },
+        dismissButton = { TextButton(onClick = onIptal) { Text("Vazgec") } }
+    )
 }

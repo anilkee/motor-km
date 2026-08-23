@@ -99,6 +99,11 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Google ile giris (Credential Manager)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
     // Acik kaynak harita - Google Maps API anahtari gerektirmez
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 }
