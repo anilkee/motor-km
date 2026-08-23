@@ -18,6 +18,9 @@ private val Amber = Color(0xFFE08700)
 private val AmberAcik = Color(0xFFFFD08A)
 private val Kirmizi = Color(0xFFC62828)
 
+/** Paket tusu ve harita isaretleri icin - yesil/amber ile karismasin diye ayri. */
+val PaketMavi = Color(0xFF1565C0)
+
 private val AcikTema = lightColorScheme(
     primary = Yesil,
     onPrimary = Color.White,

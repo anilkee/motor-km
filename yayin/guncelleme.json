@@ -1,6 +1,6 @@
 {
-    "versionCode":  3,
-    "versionName":  "1.2",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.2/eve-gitmem-gerek-1.2.apk",
-    "notes":  "Guncelleme dosyasindaki BOM sorunu giderildi."
+    "versionCode":  4,
+    "versionName":  "1.3",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.3/eve-gitmem-gerek-1.3.apk",
+    "notes":  "Paket sayaci eklendi: tek dokunusla say, konumu kaydet, haritada gor. Ana ekran widget\u0027i ve titresimli onay. Bakim hatirlaticilari (yag, zincir, lastik, muayene, sigorta)."
 }

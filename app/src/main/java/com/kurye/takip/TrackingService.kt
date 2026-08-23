@@ -23,6 +23,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.kurye.takip.data.Repo
+import com.kurye.takip.widget.KuryeWidget
 
 /**
  * Vardiya suresince on planda calisip konum toplayan servis.
@@ -35,6 +36,8 @@ class TrackingService : Service(), LocationListener {
     companion object {
         const val ACTION_START = "com.kurye.takip.START"
         const val ACTION_STOP = "com.kurye.takip.STOP"
+        const val ACTION_PACKAGE = "com.kurye.takip.PACKAGE"
+        const val ACTION_UNDO_PACKAGE = "com.kurye.takip.UNDO_PACKAGE"
         const val EXTRA_AUTO_STOP = "auto_stop_at"
 
         private const val CHANNEL_ID = "vardiya"
@@ -67,6 +70,20 @@ class TrackingService : Service(), LocationListener {
             val i = Intent(context, TrackingService::class.java).apply { action = ACTION_STOP }
             ContextCompat.startForegroundService(context, i)
         }
+
+        /** Paket birakildi: bulundugun yeri isaretle. */
+        fun paketEkle(context: Context) {
+            val i = Intent(context, TrackingService::class.java).apply { action = ACTION_PACKAGE }
+            ContextCompat.startForegroundService(context, i)
+        }
+
+        /** Yanlislikla basildiysa son paketi geri al. */
+        fun paketGeriAl(context: Context) {
+            val i = Intent(context, TrackingService::class.java).apply {
+                action = ACTION_UNDO_PACKAGE
+            }
+            ContextCompat.startForegroundService(context, i)
+        }
     }
 
     private lateinit var repo: Repo
@@ -82,12 +99,16 @@ class TrackingService : Service(), LocationListener {
     private var autoStopAt: Long? = null
     private var listening = false
 
+    /** startForeground() cagrildi mi. */
+    private var onPlanda = false
+
     /** 20 saniyede bir: mesafeyi diske yaz, bildirimi tazele, otomatik bitisi kontrol et. */
     private val ticker = object : Runnable {
         override fun run() {
             if (shiftId > 0) {
                 repo.updateDistance(shiftId, totalDistanceM)
                 updateNotification()
+                KuryeWidget.tazele(this@TrackingService)
                 val stopAt = autoStopAt
                 if (stopAt != null && System.currentTimeMillis() >= stopAt) {
                     finishShift()
@@ -115,6 +136,16 @@ class TrackingService : Service(), LocationListener {
                 val auto = intent.getLongExtra(EXTRA_AUTO_STOP, -1L)
                 beginShift(if (auto > 0L) auto else null)
             }
+            ACTION_PACKAGE -> {
+                toparlaGerekirse()
+                paketKaydet()
+                return START_STICKY
+            }
+            ACTION_UNDO_PACKAGE -> {
+                toparlaGerekirse()
+                paketGeriAl()
+                return START_STICKY
+            }
             else -> {
                 // Sistem servisi oldurup yeniden basladi: yarim kalan vardiyayi topla.
                 val active = repo.activeShift()
@@ -129,6 +160,18 @@ class TrackingService : Service(), LocationListener {
     }
 
     // ------------------------------------------------------------- vardiya
+
+    /**
+     * Servis yeniden yaratildiysa (uygulama bellekten atildiktan sonra
+     * widget'tan paket eklenirse) acik vardiyayi DB'den geri yukler.
+     * resumeShift ayni zamanda startForeground() cagirir, boylece
+     * startForegroundService sozu de yerine gelir.
+     */
+    private fun toparlaGerekirse() {
+        if (shiftId > 0) return
+        val acik = repo.activeShift() ?: return
+        resumeShift(acik.id, acik.distanceM, acik.autoStopAt, acik.startTime)
+    }
 
     private fun beginShift(autoStop: Long?) {
         if (shiftId > 0) return // zaten calisiyor
@@ -157,6 +200,7 @@ class TrackingService : Service(), LocationListener {
         startListening()
         handler.removeCallbacks(ticker)
         handler.postDelayed(ticker, 20_000L)
+        KuryeWidget.tazele(this)
     }
 
     private fun resumeShift(id: Long, distance: Double, autoStop: Long?, startedAt: Long) {
@@ -175,25 +219,109 @@ class TrackingService : Service(), LocationListener {
         TrackerState.path.value = saved
         TrackerState.pointCount.value = saved.size
 
+        val paketler = repo.deliveries(id).map { LatLon(it.lat, it.lon) }
+        TrackerState.deliveries.value = paketler
+        TrackerState.deliveryCount.value = paketler.size
+
         goForeground()
         startListening()
         handler.removeCallbacks(ticker)
         handler.postDelayed(ticker, 20_000L)
+        KuryeWidget.tazele(this)
     }
 
     private fun finishShift() {
         handler.removeCallbacks(ticker)
         stopListening()
+
         if (shiftId > 0) {
             // Son konumu da rotaya yaz.
             lastLocation?.let { savePoint(it) }
             repo.endShift(shiftId, totalDistanceM)
+        } else {
+            // Servis yeniden yaratilmis olabilir: uygulama bellekten atildiktan
+            // sonra widget'tan/bildirimden "bitir" denirse shiftId bos gelir.
+            // Bu durumda DB'deki acik vardiyayi bulup kapat; yoksa vardiya
+            // sonsuza kadar acik kalir.
+            repo.activeShift()?.let { acik ->
+                repo.endShift(acik.id, acik.distanceM)
+            }
         }
+        // Daha once yarim kalmis baska vardiya varsa onlari da kapat.
+        repo.closeDanglingShifts()
+
         shiftId = -1L
         TrackerState.reset()
         releaseWakeLock()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        onPlanda = false
+        KuryeWidget.tazele(this)
         stopSelf()
+    }
+
+    // -------------------------------------------------------------- paket
+
+    /**
+     * Paket birakildi. O anki konumu isaretler, titresim verir.
+     * Vardiya kapaliysa hicbir sey yapmaz ama farkli titresimle uyarir.
+     */
+    private fun paketKaydet() {
+        if (shiftId <= 0) {
+            titret(Titresim.OLMADI)               // cift kisa: "vardiya kapali"
+            durdurEgerOnPlandaDegilse()
+            return
+        }
+        val konum = lastLocation ?: sonBilinenKonum()
+        if (konum == null) {
+            titret(Titresim.OLMADI)               // konum yok, kaydedilemedi
+            return
+        }
+
+        repo.addDelivery(shiftId, konum.latitude, konum.longitude)
+        TrackerState.deliveries.value =
+            TrackerState.deliveries.value + LatLon(konum.latitude, konum.longitude)
+        TrackerState.deliveryCount.value = TrackerState.deliveryCount.value + 1
+
+        titret(longArrayOf(0, 55))                // tek kisa: "kaydedildi"
+        updateNotification()
+        KuryeWidget.tazele(this)
+    }
+
+    private fun paketGeriAl() {
+        if (shiftId <= 0) {
+            durdurEgerOnPlandaDegilse()
+            return
+        }
+        if (repo.deleteLastDelivery(shiftId)) {
+            TrackerState.deliveries.value = TrackerState.deliveries.value.dropLast(1)
+            TrackerState.deliveryCount.value =
+                (TrackerState.deliveryCount.value - 1).coerceAtLeast(0)
+            titret(longArrayOf(0, 40, 80, 40, 80, 40))  // uc kisa: "geri alindi"
+            updateNotification()
+            KuryeWidget.tazele(this)
+        }
+    }
+
+    /** GPS henuz taze bir konum vermediyse sistemin son bildigi konumu kullan. */
+    private fun sonBilinenKonum(): Location? {
+        if (!hasLocationPermission()) return null
+        return try {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        } catch (_: SecurityException) {
+            null
+        }
+    }
+
+    private fun titret(desen: LongArray) = Titresim.cal(this, desen)
+
+    /**
+     * startForegroundService ile uyandirildik ama yapacak is yoktu (vardiya
+     * kapali). Android 8+ bu durumda 5 saniye icinde startForeground()
+     * cagrilmazsa uygulamayi cokertir; o yuzden hemen duruyoruz.
+     */
+    private fun durdurEgerOnPlandaDegilse() {
+        if (!onPlanda) stopSelf()
     }
 
     // -------------------------------------------------------------- konum
@@ -346,6 +474,11 @@ class TrackingService : Service(), LocationListener {
             Intent(this, TrackingService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val paketIntent = PendingIntent.getService(
+            this, 2,
+            Intent(this, TrackingService::class.java).apply { action = ACTION_PACKAGE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val autoText = autoStopAt?.let {
             val c = java.util.Calendar.getInstance().apply { timeInMillis = it }
@@ -355,14 +488,22 @@ class TrackingService : Service(), LocationListener {
             )
         } ?: ""
 
+        val paket = TrackerState.deliveryCount.value
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(String.format(java.util.Locale.getDefault(), "%.2f km  -  %dsa %02ddk", km, h, m))
+            .setContentTitle(
+                String.format(
+                    java.util.Locale.getDefault(),
+                    "%.2f km  -  %d paket  -  %dsa %02ddk", km, paket, h, m
+                )
+            )
             .setContentText("Vardiya devam ediyor$autoText")
             .setSmallIcon(R.drawable.ic_stat_konum)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Vardiyayi bitir", stopIntent)
+            .addAction(R.drawable.ic_stat_paket, "+1 paket", paketIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Bitir", stopIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
@@ -374,6 +515,7 @@ class TrackingService : Service(), LocationListener {
             0
         }
         ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(), type)
+        onPlanda = true
     }
 
     private fun updateNotification() {

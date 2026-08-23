@@ -119,7 +119,7 @@ fun HistoryScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            sayi(v.avgKmh, 0) + " km/s ort.",
+                            "${repo.deliveryCount(v.id)} paket  -  " + sayi(v.avgKmh, 0) + " km/s",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -142,6 +142,8 @@ private fun ShiftDetail(
 ) {
     val noktalar = remember(shift.id) { repo.points(shift.id) }
     val rota = remember(shift.id) { noktalar.map { LatLon(it.lat, it.lon) } }
+    val paketler = remember(shift.id) { repo.deliveries(shift.id) }
+    val paketYerleri = remember(shift.id) { paketler.map { LatLon(it.lat, it.lon) } }
     var silOnayi by remember { mutableStateOf(false) }
 
     // Scaffold ic ice kullanilmiyor: ust cubuk pay'i iki kez uygulanip
@@ -178,7 +180,7 @@ private fun ShiftDetail(
                 StatBox("Mesafe", kmDeger(shift.km) + " km", modifier = Modifier.weight(1f))
                 StatBox("Sure", sure(shift.durationMs), modifier = Modifier.weight(1f))
                 StatBox("Ortalama", sayi(shift.avgKmh, 0) + " km/s", modifier = Modifier.weight(1f))
-                StatBox("Nokta", "${noktalar.size}", modifier = Modifier.weight(1f))
+                StatBox("Paket", "${paketler.size}", modifier = Modifier.weight(1f))
             }
 
             // harita
@@ -199,7 +201,12 @@ private fun ShiftDetail(
                         )
                     }
                 } else {
-                    RouteMap(path = rota, fitAll = true, modifier = Modifier.fillMaxSize())
+                    RouteMap(
+                        path = rota,
+                        fitAll = true,
+                        paketler = paketYerleri,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
 

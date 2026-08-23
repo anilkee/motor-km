@@ -57,6 +57,7 @@ fun SummaryScreen(
     val tuketim = remember(aralik) { repo.consumption(bas, son) }
     // Tarih araligindan bagimsiz: hic dolum girilmis mi?
     val hicDolumVar = remember(aralik) { repo.fuels(1).isNotEmpty() }
+    val paketSayisi = remember(aralik) { repo.deliveryCountBetween(bas, son) }
     val vardiyalar = remember(aralik) { repo.shiftsBetween(bas, son) }
 
     // Gunluk kirilim
@@ -118,6 +119,32 @@ fun SummaryScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                    if (paketSayisi > 0) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            StatBox(
+                                "Paket", "$paketSayisi",
+                                renk = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatBox(
+                                "Paket basina", sayi(ozet.km / paketSayisi, 1) + " km",
+                                renk = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatBox(
+                                "Saatte",
+                                if (ozet.activeMs > 0)
+                                    sayi(paketSayisi / (ozet.activeMs / 3_600_000.0), 1) + " paket"
+                                else "-",
+                                renk = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -156,6 +183,12 @@ fun SummaryScreen(
                     SatirDeger("Olculen mesafe", kmDeger(tuketim.km) + " km")
                     SatirDeger("Bu mesafede yakilan", litre(tuketim.liters))
                     SatirDeger("Kac dolumdan hesaplandi", "${tuketim.olcumSayisi}")
+                    if (paketSayisi > 0) {
+                        SatirDeger(
+                            "Paket basina yakit",
+                            lira(ozet.km / paketSayisi * tuketim.tryPerKm)
+                        )
+                    }
 
                     Spacer(Modifier.height(8.dp))
                     Text(

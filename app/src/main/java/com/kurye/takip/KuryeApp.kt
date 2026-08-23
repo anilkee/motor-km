@@ -36,6 +36,8 @@ class KuryeApp : Application() {
             TrackerState.distanceM.value = s.distanceM
             TrackerState.path.value = repo.points(s.id).map { LatLon(it.lat, it.lon) }
             TrackerState.pointCount.value = TrackerState.path.value.size
+            TrackerState.deliveries.value = repo.deliveries(s.id).map { LatLon(it.lat, it.lon) }
+            TrackerState.deliveryCount.value = TrackerState.deliveries.value.size
         }
     }
 }

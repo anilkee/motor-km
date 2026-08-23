@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">eve gitmem gerek heryerdeyim</string>
     <string name="app_name_short">eve gitmem gerek</string>
+    <string name="widget_aciklama">Vardiya baslat/bitir ve tek dokunusla paket ekle</string>
 </resources>

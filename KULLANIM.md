@@ -34,6 +34,44 @@ kesebilir.
 
 ## Kullanımı
 
+### Ana ekran widget'ı
+Uygulamayı hiç açmadan çalışır. Ana ekrana uzun bas → **Widget'lar** → uygulamayı
+bul → sürükle.
+
+- Canlı **km** ve **paket** sayısı
+- **+1 PAKET** — tek dokunuş, titreşimle onaylar
+- **BAŞLAT / BİTİR** — vardiyayı açıp kapatır
+- Üst kısma dokununca uygulama açılır
+
+Motor üstünde, eldivenle, ekrana bakmadan kullanılabilsin diye tuşlar büyük
+tutuldu ve her işlem farklı titreşim veriyor:
+
+| Titreşim | Anlamı |
+|---|---|
+| Tek kısa | Paket kaydedildi |
+| Üç kısa | Son paket geri alındı |
+| Çift kısa | Olmadı (vardiya kapalı ya da konum yok) |
+
+### Paket sayacı
+Paketi bıraktığın anda **+1 PAKET**'e bas — sayaç artar ve **o anki konumun
+kaydedilir**. Sonradan Geçmiş sekmesinden o günün haritasında paketleri nereye
+bıraktığını turuncu noktalar olarak görürsün.
+
+Yanlışlıkla bastıysan yanındaki geri al tuşuyla sonuncuyu silersin.
+
+Paket sayacına üç yerden basabilirsin: uygulama içinden, ana ekran widget'ından
+ve bildirim çubuğundaki **+1 paket** tuşundan.
+
+### Bakım sekmesi
+Yağ, zincir, lastik, balata gibi kalemler **km bazlı**; muayene, sigorta, kasko
+**tarih bazlı** takip edilir. Hazır listeden seçersin ya da kendin yazarsın.
+
+Her kalem bir çubukla ne kadar dolduğunu gösterir: yeşil → sarı (%85) → kırmızı
+(süre doldu). Bakımı yaptırınca **Yaptım** de, sayaç sıfırlanır.
+
+Sayaçlar uygulamanın ölçtüğü toplam km'ye göre ilerler; motorun kendi kilometre
+saatiyle aynı olması gerekmez.
+
 ### Vardiya sekmesi
 - Ortadaki **VARDİYAYI BAŞLAT** tuşuna bas, iş başlasın.
 - Üstte canlı olarak **km / süre / anlık hız / ortalama hız** görürsün.

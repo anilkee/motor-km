@@ -33,6 +33,57 @@ data class TrackPoint(
     val speedKmh: Double get() = speedMs * 3.6
 }
 
+/** Birakilan paket: ne zaman, nerede. */
+data class Delivery(
+    val id: Long,
+    val shiftId: Long,
+    val time: Long,
+    val lat: Double,
+    val lon: Double,
+    val note: String?
+)
+
+/**
+ * Bakim kalemi. Iki turlu olabilir:
+ *  - km bazli  (yag, zincir, lastik)   -> [aralikKm] dolu
+ *  - tarih bazli (muayene, sigorta)    -> [aralikGun] dolu
+ * Ikisi birden dolu olabilir; hangisi once dolarsa o uyarir.
+ */
+data class MaintenanceItem(
+    val id: Long,
+    val ad: String,
+    /** Son bakim aninda uygulamanin toplam km'si. */
+    val sonKm: Double,
+    val sonTarih: Long,
+    val aralikKm: Double?,
+    val aralikGun: Int?
+) {
+    /** Bu bakimdan beri gecen km. */
+    fun gecenKm(toplamKm: Double): Double = (toplamKm - sonKm).coerceAtLeast(0.0)
+
+    fun gecenGun(): Int =
+        ((System.currentTimeMillis() - sonTarih) / 86_400_000L).toInt().coerceAtLeast(0)
+
+    /** Km tarafinda ne kadar dolmus (0..1+). Km bazli degilse null. */
+    fun kmOran(toplamKm: Double): Double? =
+        aralikKm?.takeIf { it > 0 }?.let { gecenKm(toplamKm) / it }
+
+    /** Tarih tarafinda ne kadar dolmus (0..1+). Tarih bazli degilse null. */
+    fun gunOran(): Double? =
+        aralikGun?.takeIf { it > 0 }?.let { gecenGun().toDouble() / it }
+
+    /** Iki taraftan hangisi daha doluysa o. */
+    fun doluluk(toplamKm: Double): Double =
+        maxOf(kmOran(toplamKm) ?: 0.0, gunOran() ?: 0.0)
+
+    /** Kalan km (km bazli degilse null). */
+    fun kalanKm(toplamKm: Double): Double? =
+        aralikKm?.let { it - gecenKm(toplamKm) }
+
+    /** Kalan gun (tarih bazli degilse null). */
+    fun kalanGun(): Int? = aralikGun?.let { it - gecenGun() }
+}
+
 /** Yakit alimi kaydi. */
 data class FuelEntry(
     val id: Long,

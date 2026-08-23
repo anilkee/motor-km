@@ -30,7 +30,9 @@ fun RouteMap(
     path: List<LatLon>,
     modifier: Modifier = Modifier,
     followLast: Boolean = false,
-    fitAll: Boolean = false
+    fitAll: Boolean = false,
+    /** Paket birakilan yerler; haritada ayri renkte isaretlenir. */
+    paketler: List<LatLon> = emptyList()
 ) {
     val ctx = LocalContext.current
 
@@ -54,8 +56,8 @@ fun RouteMap(
         }
     }
 
-    // Rota degistikce cizimi tazele.
-    LaunchedEffect(path.size, path.lastOrNull()) {
+    // Rota veya paketler degistikce cizimi tazele.
+    LaunchedEffect(path.size, path.lastOrNull(), paketler.size) {
         mapView.overlays.clear()
 
         if (path.size >= 2) {
@@ -68,6 +70,11 @@ fun RouteMap(
                 setPoints(path.map { GeoPoint(it.lat, it.lon) })
             }
             mapView.overlays.add(line)
+        }
+
+        // Paket birakilan yerler (turuncu), rotanin ustunde dursun.
+        paketler.forEach { p ->
+            mapView.overlays.add(nokta(p, "#E08700", 26.0))
         }
 
         path.firstOrNull()?.let { basla ->

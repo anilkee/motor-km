@@ -33,6 +33,12 @@ object TrackerState {
     /** Kaydedilen nokta sayisi. */
     val pointCount = MutableStateFlow(0)
 
+    /** Bu vardiyada birakilan paketlerin yerleri. */
+    val deliveries = MutableStateFlow<List<LatLon>>(emptyList())
+
+    /** Bu vardiyada birakilan paket sayisi. */
+    val deliveryCount = MutableStateFlow(0)
+
     fun reset() {
         running.value = false
         shiftId.value = -1L
@@ -44,5 +50,7 @@ object TrackerState {
         accuracyM.value = 0f
         path.value = emptyList()
         pointCount.value = 0
+        deliveries.value = emptyList()
+        deliveryCount.value = 0
     }
 }

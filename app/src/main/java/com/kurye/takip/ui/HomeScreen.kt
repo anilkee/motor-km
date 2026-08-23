@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +59,8 @@ fun HomeScreen(
     prefs: Prefs,
     onStart: (Long?) -> Unit,
     onStop: () -> Unit,
+    onPaket: () -> Unit,
+    onPaketGeriAl: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val calisiyor by TrackerState.running.collectAsState()
@@ -66,6 +71,8 @@ fun HomeScreen(
     val fixVar by TrackerState.hasFix.collectAsState()
     val dogruluk by TrackerState.accuracyM.collectAsState()
     val rota by TrackerState.path.collectAsState()
+    val paketSayisi by TrackerState.deliveryCount.collectAsState()
+    val paketYerleri by TrackerState.deliveries.collectAsState()
 
     // Kronometre: saniyede bir tazelensin.
     var simdi by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -120,6 +127,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     StatBox("Sure", kronometre(gecenSure), modifier = Modifier.weight(1f))
+                    StatBox("Paket", "$paketSayisi", modifier = Modifier.weight(1f))
                     StatBox("Anlik", sayi(hiz, 0) + " km/s", modifier = Modifier.weight(1f))
                     StatBox("Ortalama", sayi(ortHiz, 0) + " km/s", modifier = Modifier.weight(1f))
                 }
@@ -183,6 +191,7 @@ fun HomeScreen(
                     path = rota,
                     followLast = calisiyor,
                     fitAll = !calisiyor,
+                    paketler = paketYerleri,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -222,6 +231,48 @@ fun HomeScreen(
                         prefs.autoStopEnabled = it
                     }
                 )
+            }
+        }
+
+        // ------------------------------------------------- +1 paket tusu
+        // Vardiya acikken en kolay ulasilan tus bu olsun: gun icinde
+        // onlarca kez, eldivenle, ekrana bakmadan basiliyor.
+        if (calisiyor) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onPaket,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PaketMavi,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.weight(3f).height(64.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.AddCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Text("1 PAKET", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = onPaketGeriAl,
+                    enabled = paketSayisi > 0,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.weight(1f).height(64.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Undo,
+                        contentDescription = "Son paketi geri al",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 

@@ -7,9 +7,10 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 internal class Db(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
+        surum2Tablolari(db)
         db.execSQL(
             "CREATE TABLE shifts (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -42,7 +43,32 @@ internal class Db(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Ileride sema degisirse buraya ALTER TABLE eklenecek. Veri asla silinmez.
+        // Veri asla silinmez; sadece eksik tablolar eklenir.
+        if (oldVersion < 2) surum2Tablolari(db)
+    }
+
+    /** Paket ve bakim tablolari (sema surumu 2 ile geldi). */
+    private fun surum2Tablolari(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS deliveries (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "shift_id INTEGER NOT NULL," +
+                "time INTEGER NOT NULL," +
+                "lat REAL NOT NULL," +
+                "lon REAL NOT NULL," +
+                "note TEXT)"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_deliveries_shift ON deliveries(shift_id, time)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_deliveries_time ON deliveries(time)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS maintenance (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "ad TEXT NOT NULL," +
+                "son_km REAL NOT NULL DEFAULT 0," +
+                "son_tarih INTEGER NOT NULL," +
+                "aralik_km REAL," +
+                "aralik_gun INTEGER)"
+        )
     }
 }
 
@@ -54,7 +80,26 @@ class Repo(context: Context) {
 
     // ------------------------------------------------------------- vardiya
 
+    /**
+     * Yarim kalmis vardiyalari kapatir.
+     *
+     * Servis pil optimizasyonu ya da zorla durdurma yuzunden oldurulurse
+     * vardiya satiri "acik" kalabilir. Bunlar birikirse uygulama surekli
+     * "vardiya devam ediyor" saniyor. Bitis zamani olarak o vardiyanin son
+     * konum kaydinin zamani kullanilir; hic konum yoksa baslangic zamani.
+     */
+    fun closeDanglingShifts(haricId: Long = -1L) {
+        db.execSQL(
+            "UPDATE shifts SET end_time = COALESCE(" +
+                "(SELECT MAX(time) FROM points WHERE points.shift_id = shifts.id), start_time) " +
+                "WHERE end_time IS NULL AND id <> ?",
+            arrayOf<Any>(haricId)
+        )
+    }
+
     fun startShift(autoStopAt: Long?): Long {
+        // Once yarim kalanlari temizle ki ayni anda tek acik vardiya olsun.
+        closeDanglingShifts()
         val v = ContentValues().apply {
             put("start_time", System.currentTimeMillis())
             put("distance_m", 0.0)
@@ -162,6 +207,95 @@ class Repo(context: Context) {
         db.delete("fuel", "id=?", arrayOf(id.toString()))
     }
 
+    // --------------------------------------------------------------- paket
+
+    fun addDelivery(shiftId: Long, lat: Double, lon: Double, note: String? = null): Long {
+        val v = ContentValues().apply {
+            put("shift_id", shiftId)
+            put("time", System.currentTimeMillis())
+            put("lat", lat)
+            put("lon", lon)
+            put("note", note)
+        }
+        return db.insert("deliveries", null, v)
+    }
+
+    fun deliveries(shiftId: Long): List<Delivery> =
+        db.rawQuery(
+            "SELECT * FROM deliveries WHERE shift_id=? ORDER BY time ASC",
+            arrayOf(shiftId.toString())
+        ).use { it.mapAll { c -> c.toDelivery() } }
+
+    fun deliveryCount(shiftId: Long): Int =
+        db.rawQuery(
+            "SELECT COUNT(*) FROM deliveries WHERE shift_id=?",
+            arrayOf(shiftId.toString())
+        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
+    fun deliveryCountBetween(from: Long, to: Long): Int =
+        db.rawQuery(
+            "SELECT COUNT(*) FROM deliveries WHERE time>=? AND time<?",
+            arrayOf(from.toString(), to.toString())
+        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
+    fun deliveriesBetween(from: Long, to: Long): List<Delivery> =
+        db.rawQuery(
+            "SELECT * FROM deliveries WHERE time>=? AND time<? ORDER BY time ASC",
+            arrayOf(from.toString(), to.toString())
+        ).use { it.mapAll { c -> c.toDelivery() } }
+
+    /** Son eklenen paketi siler (yanlislikla basildiysa). */
+    fun deleteLastDelivery(shiftId: Long): Boolean =
+        db.delete(
+            "deliveries",
+            "id = (SELECT id FROM deliveries WHERE shift_id=? ORDER BY time DESC LIMIT 1)",
+            arrayOf(shiftId.toString())
+        ) > 0
+
+    fun deleteDelivery(id: Long) {
+        db.delete("deliveries", "id=?", arrayOf(id.toString()))
+    }
+
+    // --------------------------------------------------------------- bakim
+
+    fun maintenanceItems(): List<MaintenanceItem> =
+        db.rawQuery("SELECT * FROM maintenance ORDER BY id", null)
+            .use { it.mapAll { c -> c.toMaintenance() } }
+
+    fun addMaintenance(
+        ad: String,
+        aralikKm: Double?,
+        aralikGun: Int?,
+        toplamKm: Double
+    ): Long {
+        val v = ContentValues().apply {
+            put("ad", ad)
+            put("son_km", toplamKm)
+            put("son_tarih", System.currentTimeMillis())
+            if (aralikKm != null) put("aralik_km", aralikKm) else putNull("aralik_km")
+            if (aralikGun != null) put("aralik_gun", aralikGun) else putNull("aralik_gun")
+        }
+        return db.insert("maintenance", null, v)
+    }
+
+    /** "Yaptim" - sayaci sifirlar. */
+    fun resetMaintenance(id: Long, toplamKm: Double) {
+        val v = ContentValues().apply {
+            put("son_km", toplamKm)
+            put("son_tarih", System.currentTimeMillis())
+        }
+        db.update("maintenance", v, "id=?", arrayOf(id.toString()))
+    }
+
+    fun deleteMaintenance(id: Long) {
+        db.delete("maintenance", "id=?", arrayOf(id.toString()))
+    }
+
+    /** Uygulamanin olctugu toplam km (bakim sayaclarinin referansi). */
+    fun toplamKm(): Double =
+        db.rawQuery("SELECT SUM(distance_m) FROM shifts", null)
+            .use { if (it.moveToFirst() && !it.isNull(0)) it.getDouble(0) / 1000.0 else 0.0 }
+
     // ---------------------------------------------------------------- ozet
 
     fun summary(from: Long, to: Long): Summary {
@@ -264,6 +398,24 @@ class Repo(context: Context) {
         lon = getDouble(getColumnIndexOrThrow("lon")),
         speedMs = getDouble(getColumnIndexOrThrow("speed")).toFloat(),
         accuracyM = getDouble(getColumnIndexOrThrow("accuracy")).toFloat()
+    )
+
+    private fun Cursor.toDelivery() = Delivery(
+        id = getLong(getColumnIndexOrThrow("id")),
+        shiftId = getLong(getColumnIndexOrThrow("shift_id")),
+        time = getLong(getColumnIndexOrThrow("time")),
+        lat = getDouble(getColumnIndexOrThrow("lat")),
+        lon = getDouble(getColumnIndexOrThrow("lon")),
+        note = getColumnIndexOrThrow("note").let { if (isNull(it)) null else getString(it) }
+    )
+
+    private fun Cursor.toMaintenance() = MaintenanceItem(
+        id = getLong(getColumnIndexOrThrow("id")),
+        ad = getString(getColumnIndexOrThrow("ad")),
+        sonKm = getDouble(getColumnIndexOrThrow("son_km")),
+        sonTarih = getLong(getColumnIndexOrThrow("son_tarih")),
+        aralikKm = getColumnIndexOrThrow("aralik_km").let { if (isNull(it)) null else getDouble(it) },
+        aralikGun = getColumnIndexOrThrow("aralik_gun").let { if (isNull(it)) null else getInt(it) }
     )
 
     private fun Cursor.toFuel() = FuelEntry(

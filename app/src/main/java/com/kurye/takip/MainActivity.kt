@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Navigation
@@ -52,6 +53,7 @@ import com.kurye.takip.ui.FuelScreen
 import com.kurye.takip.ui.HistoryScreen
 import com.kurye.takip.ui.HomeScreen
 import com.kurye.takip.ui.KuryeTheme
+import com.kurye.takip.ui.MaintenanceScreen
 import com.kurye.takip.ui.SettingsScreen
 import com.kurye.takip.ui.SummaryScreen
 import com.kurye.takip.update.CheckResult
@@ -76,7 +78,8 @@ private val SEKMELER = listOf(
     Sekme("Vardiya", Icons.Filled.Navigation),
     Sekme("Yakit", Icons.Filled.LocalGasStation),
     Sekme("Gecmis", Icons.Filled.History),
-    Sekme("Ozet", Icons.Filled.QueryStats)
+    Sekme("Ozet", Icons.Filled.QueryStats),
+    Sekme("Bakim", Icons.Filled.Build)
 )
 
 private fun konumIzniVar(ctx: Context): Boolean =
@@ -243,11 +246,14 @@ fun AppRoot(repo: Repo, prefs: Prefs) {
                     0 -> HomeScreen(
                         prefs = prefs,
                         onStart = { vardiyaBaslat(it) },
-                        onStop = { TrackingService.stop(ctx) }
+                        onStop = { TrackingService.stop(ctx) },
+                        onPaket = { TrackingService.paketEkle(ctx) },
+                        onPaketGeriAl = { TrackingService.paketGeriAl(ctx) }
                     )
                     1 -> FuelScreen(repo = repo, prefs = prefs)
                     2 -> HistoryScreen(repo = repo)
-                    else -> SummaryScreen(repo = repo)
+                    3 -> SummaryScreen(repo = repo)
+                    else -> MaintenanceScreen(repo = repo)
                 }
             }
         }
