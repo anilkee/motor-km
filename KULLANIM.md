@@ -86,46 +86,62 @@ tüketim** çıkar.
 
 ## Güncelleme yayınlama
 
-Bana "şunu da ekle" dediğinde ben kodu değiştirip yeni sürüm çıkarıyorum. Akış:
+Depo: **https://github.com/anilkee/motor-km**
 
-### 1. Bilgisayarda (bir kere adres verilir)
-
-```powershell
-.\yayinla.ps1 -Aciklama "Yakıt ekranına not alanı eklendi" -Adres "https://.../yayin"
-```
-
-Sonraki seferler adres istemez:
+Bana "şunu da ekle" dediğinde kodu değiştirip yeni sürüm çıkarıyorum. Yayınlamak
+tek komut:
 
 ```powershell
-.\yayinla.ps1 -Aciklama "Harita hızlandırıldı"
+.\yayinla.ps1 -Aciklama "Yakıt ekranına not alanı eklendi"
 ```
 
-Bu script:
-- sürüm numarasını otomatik yükseltir (1.0 → 1.1 → 1.2 …)
-- APK'yı **aynı imza anahtarıyla** derler
-- `yayin/` klasörüne APK + `guncelleme.json` koyar
+Bu komut sırayla şunları yapar:
 
-### 2. `yayin` klasöründeki iki dosyayı internete yükle
-GitHub deposu, kendi siten, herhangi bir dosya barındırma — fark etmez.
-Önemli olan `guncelleme.json` adresinin sabit kalması.
+1. Sürüm numarasını yükseltir (1.0 → 1.1 → 1.2 …)
+2. APK'yı **aynı imza anahtarıyla** derler
+3. GitHub'da yeni bir sürüm (release) açıp APK'yı oraya yükler
+4. `guncelleme.json`'u tazeleyip depoya gönderir
 
-### 3. Telefonda
+Telefonda hiçbir şey yapmana gerek yok — uygulama bir sonraki açılışta
+*"Yeni sürüm hazır"* diye sorar. Hemen görmek istersen:
 **Ayarlar → Güncelleme var mı bak → İndir ve kur**
 
-Açılışta otomatik kontrol de açık; yeni sürüm varsa Ayarlar ekranında görürsün.
+> **Not:** GitHub'ın önbelleği yüzünden yeni sürüm telefonda **5 dakika kadar
+> gecikmeli** görünebilir. Yayınladıktan hemen sonra bakarsan "güncel" diyebilir;
+> birkaç dakika sonra tekrar dene.
+
+### Gereken ortam değişkeni
+`yayinla.ps1` GitHub'a yüklemek için `GITHUB_TOKEN` ortam değişkenini kullanır.
+Bu makinede zaten tanımlı. Başka bilgisayarda çalışacaksan orada da tanımlaman
+gerekir.
 
 ---
 
 ## Önemli: imza anahtarı
 
-`keystore/kurye.jks` dosyası uygulamanın kimliği. **Bu dosyayı kaybetme.**
-Kaybedersen yeni derlemeler telefondakinin üstüne kurulamaz — önce eski
-uygulamayı silmen, dolayısıyla tüm kayıtlarını kaybetmen gerekir.
+`keystore/kurye.jks` dosyası uygulamanın kimliği ve **GitHub'a gönderilmez**
+(`.gitignore` ile dışarıda tutulur). Şifreler de koddan ayrılıp
+`keystore.properties` dosyasına taşındı, o da depoya girmiyor.
 
-Bir yedeğini bulut hesabına at.
+Neden bu kadar önemli:
+
+- **Kaybedersen** yeni derlemeler telefondakinin üstüne kurulamaz. Eski
+  uygulamayı silmen, dolayısıyla tüm vardiya ve yakıt kayıtlarını kaybetmen
+  gerekir.
+- **Başkasının eline geçerse** senin uygulaman gibi görünen sahte bir APK
+  imzalayabilir ve telefonuna sessizce kurulabilir.
+
+**Şu iki dosyanın yedeğini bulut hesabına al** (GitHub'a değil — kişisel
+Drive/OneDrive gibi bir yere):
+
+```
+keystore/kurye.jks
+keystore.properties
+```
 
 - Şifre: `kurye2024`
 - Alias: `kurye`
+- Geçerlilik: 30 yıl (2056'ya kadar)
 
 ---
 
