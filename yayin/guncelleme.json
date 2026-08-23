@@ -1,6 +1,6 @@
-{
-  "versionCode": 1,
-  "versionName": "1.0",
-  "apkUrl": "https://github.com/anilkee/motor-km/releases/download/v1.0/eve-gitmem-gerek-1.0.apk",
-  "notes": "Ilk surum."
+﻿{
+    "versionCode":  2,
+    "versionName":  "1.1",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.1/eve-gitmem-gerek-1.1.apk",
+    "notes":  "Harita artik kendi alaninin disina tasmiyor. Yakit tuketimi depodan depoya hesaplaniyor."
 }
