@@ -1,0 +1,299 @@
+package com.kurye.takip.ui
+
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.kurye.takip.BuildConfig
+import com.kurye.takip.Prefs
+import com.kurye.takip.update.CheckResult
+import com.kurye.takip.update.UpdateInfo
+import com.kurye.takip.update.Updater
+import kotlinx.coroutines.launch
+import java.io.File
+
+@Composable
+fun SettingsScreen(
+    prefs: Prefs,
+    modifier: Modifier = Modifier,
+    otoKontrol: Boolean = false
+) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var adres by remember { mutableStateOf(prefs.updateUrl) }
+    var otoGuncelle by remember { mutableStateOf(prefs.autoCheckUpdate) }
+
+    var mesaj by remember { mutableStateOf<String?>(null) }
+    var mesajHata by remember { mutableStateOf(false) }
+    var kontrolEdiliyor by remember { mutableStateOf(false) }
+    var yeniSurum by remember { mutableStateOf<UpdateInfo?>(null) }
+    var indiriliyor by remember { mutableStateOf(false) }
+    var ilerleme by remember { mutableFloatStateOf(0f) }
+    var indirilenDosya by remember { mutableStateOf<File?>(null) }
+
+    fun kontrolEt() {
+        scope.launch {
+            kontrolEdiliyor = true
+            mesaj = null
+            yeniSurum = null
+            when (val r = Updater.check(adres.trim())) {
+                is CheckResult.Available -> {
+                    yeniSurum = r.info
+                    mesaj = "Yeni surum bulundu: ${r.info.versionName}"
+                    mesajHata = false
+                    prefs.lastCheck = System.currentTimeMillis()
+                }
+                CheckResult.UpToDate -> {
+                    mesaj = "Uygulaman guncel."
+                    mesajHata = false
+                    prefs.lastCheck = System.currentTimeMillis()
+                }
+                CheckResult.NotConfigured -> {
+                    mesaj = "Once guncelleme adresini gir."
+                    mesajHata = true
+                }
+                is CheckResult.Failed -> {
+                    mesaj = "Kontrol edilemedi: ${r.message}"
+                    mesajHata = true
+                }
+            }
+            kontrolEdiliyor = false
+        }
+    }
+
+    // Uygulama acilisinda sessiz kontrol.
+    LaunchedEffect(otoKontrol) {
+        if (otoKontrol && prefs.autoCheckUpdate && prefs.updateUrl.isNotBlank()) {
+            kontrolEt()
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+
+        // ------------------------------------------------------ guncelleme
+        SectionCard("Guncelleme") {
+            SatirDeger("Yuklu surum", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+            if (prefs.lastCheck > 0) {
+                SatirDeger("Son kontrol", tarihSaat(prefs.lastCheck))
+            }
+
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = adres,
+                onValueChange = {
+                    adres = it
+                    prefs.updateUrl = it
+                },
+                label = { Text("Guncelleme adresi (guncelleme.json)") },
+                placeholder = { Text("https://.../guncelleme.json") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Acilista otomatik kontrol", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Uygulamayi her actiginda yeni surum var mi diye bakar",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = otoGuncelle,
+                    onCheckedChange = {
+                        otoGuncelle = it
+                        prefs.autoCheckUpdate = it
+                    }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { kontrolEt() },
+                enabled = !kontrolEdiliyor && !indiriliyor,
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Filled.Refresh, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(if (kontrolEdiliyor) "Kontrol ediliyor..." else "Guncelleme var mi bak")
+            }
+
+            mesaj?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (mesajHata) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // yeni surum kutusu
+            yeniSurum?.let { bilgi ->
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    "Surum ${bilgi.versionName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (bilgi.notes.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(bilgi.notes, style = MaterialTheme.typography.bodyMedium)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                if (indiriliyor) {
+                    if (ilerleme >= 0f) {
+                        LinearProgressIndicator(
+                            progress = { ilerleme },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Indiriliyor... %${(ilerleme * 100).toInt()}",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(6.dp))
+                        Text("Indiriliyor...", style = MaterialTheme.typography.labelMedium)
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            val hazir = indirilenDosya
+                            if (hazir != null && hazir.exists()) {
+                                if (!Updater.canInstall(ctx)) {
+                                    Updater.openInstallPermission(ctx)
+                                } else {
+                                    Updater.install(ctx, hazir)
+                                }
+                                return@Button
+                            }
+                            scope.launch {
+                                indiriliyor = true
+                                ilerleme = 0f
+                                val sonuc = Updater.download(ctx, bilgi) { y ->
+                                    ilerleme = if (y >= 0) y / 100f else -1f
+                                }
+                                indiriliyor = false
+                                sonuc.onSuccess { dosya ->
+                                    indirilenDosya = dosya
+                                    mesaj = "Indirildi, kuruluma gecebilirsin."
+                                    mesajHata = false
+                                    if (!Updater.canInstall(ctx)) {
+                                        Updater.openInstallPermission(ctx)
+                                    } else {
+                                        Updater.install(ctx, dosya)
+                                    }
+                                }.onFailure { e ->
+                                    mesaj = "Indirilemedi: ${e.message}"
+                                    mesajHata = true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                    ) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text(
+                            if (indirilenDosya != null) "Kur" else "Indir ve kur"
+                        )
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------ pil ayari
+        SectionCard("Arka planda calisma") {
+            Text(
+                "Vardiya sirasinda telefon ekrani kapaliyken de konum kaydedilir. " +
+                    "Bazi telefonlar pil tasarrufu icin uygulamayi durdurabilir; " +
+                    "asagidan bu uygulamayi 'kisitlama yok' yapman onerilir.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Filled.BatteryAlert, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Pil ayarlarini ac")
+            }
+        }
+
+        // ------------------------------------------------------ hakkinda
+        SectionCard("Hakkinda") {
+            SatirDeger("Uygulama", "eve gitmem gerek heryerdeyim")
+            SatirDeger("Surum", BuildConfig.VERSION_NAME)
+            SatirDeger("Harita", "OpenStreetMap")
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Tum veriler sadece bu telefonda tutulur, hicbir yere gonderilmez.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}

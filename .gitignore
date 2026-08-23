@@ -1,0 +1,24 @@
+# --- Derleme ciktilari ---
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# --- Yerel ayarlar ---
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# --- IMZA ANAHTARI: ASLA GITHUB'A GITMEZ ---
+# Bu anahtar kaybolursa guncellemeler telefondakinin ustune kurulamaz,
+# baskasinin eline gecerse senin uygulaman gibi gorunen sahte APK imzalanabilir.
+keystore/
+keystore.properties
+*.jks
+*.keystore
+
+# --- Uretilen APK'lar (GitHub Releases uzerinden dagitilir) ---
+yayin/*.apk
