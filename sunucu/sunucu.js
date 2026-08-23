@@ -190,8 +190,13 @@ function sayfa(baslik, govde, aktif = '') {
 body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
      background:var(--zemin);color:var(--yazi)}
 header{background:var(--yesil);color:#fff;padding:14px 20px;display:flex;
-       align-items:center;gap:20px;flex-wrap:wrap}
-header h1{font-size:17px;margin:0;font-weight:600}
+       align-items:center;gap:16px;flex-wrap:wrap}
+/* Uygulama adi uzun; dar ekranda tasip navigasyonu kaydiriyordu. */
+header h1{font-size:16px;margin:0;font-weight:600;flex:0 1 auto;min-width:0;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header .cikis{margin-left:auto;color:#fff;opacity:.8;font-size:13px;
+              text-decoration:none;white-space:nowrap}
+@media(max-width:640px){header h1{flex-basis:100%}}
 nav{display:flex;gap:6px;flex-wrap:wrap}
 nav a{color:#fff;text-decoration:none;padding:6px 12px;border-radius:20px;
       font-size:14px;opacity:.85}
@@ -230,9 +235,9 @@ a.satir:hover{text-decoration:underline}
 </style></head>
 <body>
 <header>
-  <h1>eve gitmem gerek heryerdeyim</h1>
+  <h1 title="eve gitmem gerek heryerdeyim">eve gitmem gerek heryerdeyim</h1>
   <nav>${sek('/', 'Özet')}${sek('/vardiyalar', 'Vardiyalar')}${sek('/harita', 'Harita')}${sek('/yakit', 'Yakıt')}</nav>
-  <span style="margin-left:auto"><a href="/cikis" style="color:#fff;opacity:.8;font-size:13px">Çıkış</a></span>
+  <a href="/cikis" class="cikis">Çıkış</a>
 </header>
 <main>${govde}</main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
