@@ -64,7 +64,6 @@ import java.io.File
 fun SettingsScreen(
     prefs: Prefs,
     modifier: Modifier = Modifier,
-    otoKontrol: Boolean = false,
     onCikis: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
@@ -123,13 +122,6 @@ fun SettingsScreen(
                 }
             }
             kontrolEdiliyor = false
-        }
-    }
-
-    // Uygulama acilisinda sessiz kontrol.
-    LaunchedEffect(otoKontrol) {
-        if (otoKontrol && prefs.autoCheckUpdate && prefs.updateUrl.isNotBlank()) {
-            kontrolEt()
         }
     }
 

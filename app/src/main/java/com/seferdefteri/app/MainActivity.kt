@@ -178,7 +178,6 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
     var izinReddedildi by remember { mutableStateOf(false) }
     var gpsKapali by remember { mutableStateOf(false) }
     var yeniSurum by remember { mutableStateOf<UpdateInfo?>(null) }
-    var ayarlarOtoKontrol by remember { mutableStateOf(false) }
 
 
     val izinIsteyici = rememberLauncherForActivityResult(
@@ -268,7 +267,6 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
                 actions = {
                     if (!ayarlarAcik) {
                         IconButton(onClick = {
-                            ayarlarOtoKontrol = false
                             ayarlarAcik = true
                         }) {
                             Icon(Icons.Filled.Settings, contentDescription = "Ayarlar")
@@ -311,7 +309,6 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
             if (ayarlarAcik) {
                 SettingsScreen(
                     prefs = prefs,
-                    otoKontrol = ayarlarOtoKontrol,
                     onCikis = { ayarlarAcik = false; girisYapildi = false }
                 )
             } else {
@@ -365,33 +362,15 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
         )
     }
 
+    // Giris ekranindakiyle ayni kutu: indirmeyi de kurmayi da kendi yapiyor,
+    // Ayarlar'a ugramaya gerek yok.
     yeniSurum?.let { bilgi ->
-        AlertDialog(
-            onDismissRequest = { yeniSurum = null },
-            title = { Text("Yeni surum hazir") },
-            text = {
-                Text(
-                    buildString {
-                        append("Surum ${bilgi.versionName} yayinlandi.")
-                        if (bilgi.notes.isNotBlank()) {
-                            append("\n\n")
-                            append(bilgi.notes)
-                        }
-                    }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    yeniSurum = null
-                    ayarlarOtoKontrol = true
-                    ayarlarAcik = true
-                }) { Text("Guncelle") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    prefs.skippedVersion = bilgi.versionCode
-                    yeniSurum = null
-                }) { Text("Simdi degil") }
+        GuncellemeKutusu(
+            bilgi = bilgi,
+            onKapat = { yeniSurum = null },
+            onAtla = {
+                prefs.skippedVersion = bilgi.versionCode
+                yeniSurum = null
             }
         )
     }
