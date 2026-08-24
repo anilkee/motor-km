@@ -65,6 +65,7 @@ import com.seferdefteri.app.sync.GoogleTarayici
 import com.seferdefteri.app.sync.Hesap
 import com.seferdefteri.app.sync.Yedekleyici
 import com.seferdefteri.app.ui.GirisScreen
+import com.seferdefteri.app.ui.GuncellemeKutusu
 import com.seferdefteri.app.ui.IzinScreen
 import com.seferdefteri.app.ui.izinlerTamamMi
 
@@ -125,6 +126,21 @@ private fun gpsAcikMi(ctx: Context): Boolean {
 @Composable
 fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
     val girisCtx = LocalContext.current
+    // Guncelleme kontrolu giristen BAGIMSIZ calisir.
+    // Yoksa giris yapilamadiginda girisi duzelten surume ulasmanin yolu kalmiyor.
+    var yeniSurumGiris by remember { mutableStateOf<UpdateInfo?>(null) }
+    LaunchedEffect(Unit) {
+        if (BuildConfig.KENDI_GUNCELLER && prefs.autoCheckUpdate && prefs.updateUrl.isNotBlank()) {
+            val sonuc = Updater.check(prefs.updateUrl)
+            if (sonuc is CheckResult.Available && sonuc.info.versionCode != prefs.skippedVersion) {
+                yeniSurumGiris = sonuc.info
+            }
+            if (sonuc is CheckResult.Available || sonuc is CheckResult.UpToDate) {
+                prefs.lastCheck = System.currentTimeMillis()
+            }
+        }
+    }
+
     var girisYapildi by remember { mutableStateOf(Hesap.girisYapildiMi(girisCtx)) }
     // Tarayicidan giris yapilip donuldugunde durumu tazele.
     LaunchedEffect(tarayiciDonusu) {
@@ -132,6 +148,16 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
     }
     if (!girisYapildi) {
         GirisScreen(onGirisTamam = { girisYapildi = true })
+        yeniSurumGiris?.let { bilgi ->
+            GuncellemeKutusu(
+                bilgi = bilgi,
+                onKapat = { yeniSurumGiris = null },
+                onAtla = {
+                    prefs.skippedVersion = bilgi.versionCode
+                    yeniSurumGiris = null
+                }
+            )
+        }
         return
     }
 
@@ -218,17 +244,9 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
         Yedekleyici.gerekiyorsaYedekle(ctx)
     }
 
-    // Acilista sessiz guncelleme kontrolu.
-    LaunchedEffect(Unit) {
-        if (BuildConfig.KENDI_GUNCELLER && prefs.autoCheckUpdate && prefs.updateUrl.isNotBlank()) {
-            val sonuc = Updater.check(prefs.updateUrl)
-            if (sonuc is CheckResult.Available && sonuc.info.versionCode != prefs.skippedVersion) {
-                yeniSurum = sonuc.info
-            }
-            if (sonuc is CheckResult.Available || sonuc is CheckResult.UpToDate) {
-                prefs.lastCheck = System.currentTimeMillis()
-            }
-        }
+    // Giris ekraninda yapilan kontrolun sonucunu burada da kullan.
+    LaunchedEffect(yeniSurumGiris) {
+        if (yeniSurumGiris != null) yeniSurum = yeniSurumGiris
     }
 
     Scaffold(

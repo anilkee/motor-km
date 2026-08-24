@@ -1,6 +1,6 @@
 {
-    "versionCode":  9,
-    "versionName":  "1.8",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.8/sefer-defteri-1.8.apk",
-    "notes":  "Google ile giris artik calisiyor: telefondaki hesap secici takilirsa kendiliginden tarayiciya dusuyor. Ayrica girisin ardindan konum ve bildirim izinleri, ne icin istendigi anlatilarak isteniyor."
+    "versionCode":  10,
+    "versionName":  "1.9",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.9/sefer-defteri-1.9.apk",
+    "notes":  "Guncelleme artik giris yapmadan da geliyor: yeni surum kutusu giris ekraninda cikiyor ve dogrudan oradan kuruluyor. Onceden giris yapamayan bir kullanici, girisi duzelten surume ulasamiyordu."
 }
