@@ -43,20 +43,57 @@ class TrackingService : Service(), LocationListener {
         private const val CHANNEL_ID = "vardiya"
         private const val NOTIF_ID = 1001
 
-        /** Bu degerden kotu dogruluktaki konumlar yok sayilir (metre). */
-        private const val MAX_ACCURACY_M = 45f
+        // ------------------------------------------------------------------
+        //  Mesafe filtreleri
+        //
+        //  Gercek bir vardiyanin verisiyle olculdu: eski ayarlarla 55,3 km
+        //  kaydedilmisti, bunun ~11 kmsi sahteydi. Sebep, dururken GPSin
+        //  10-25 m ziplamasi ve bu ziplamalarin mesafeye eklenmesiydi.
+        //
+        //  Yeni mantik "hareket halinde miyim" sorusunu GPSin kendi hiz
+        //  olcumune soruyor; o olcum konumlari cikararak bulunan hizdan cok
+        //  daha guvenilir (Doppler ile olculuyor).
+        // ------------------------------------------------------------------
 
-        /** GPS titremesini mesafeye saymamak icin alt esik (metre). */
-        private const val MIN_STEP_M = 6f
+        /** Bu degerden kotu dogruluktaki konumlar tamamen yok sayilir. */
+        private const val MAX_ACCURACY_M = 25f
+
+        /** Bir adim en az bu kadar olmali; bundan kucugu gurultu sayilir. */
+        private const val MIN_STEP_M = 12f
 
         /** Fiziksel olarak imkansiz siçramalari eleme esigi (m/s ~ 200 km/s). */
         private const val MAX_SPEED_MS = 55f
+
+        /**
+         * Durgunken hareket sayilmaya baslamak icin gereken hiz (m/s).
+         * 14 km/s: yuruyerek asilamaz, bu yuzden AVM icinde dolasmak
+         * kilometreye yazilmaz. Motorla hareket edince aninda asilir.
+         */
+        private const val BASLAMA_HIZI_MS = 4.0f
+
+        /** Hareket halindeyken bunun altina dusen olcumler sayilmaz. */
+        private const val SURME_HIZI_MS = 1.5f
+
+        /** Bu kadar sure yavas kalinca tekrar "durgun" sayilir (ms). */
+        private const val DURMA_SURESI_MS = 20_000L
+
+        /**
+         * Durgunken, demir attigimiz noktadan bu kadar uzaklasilmadan
+         * hareket sayilmaz. GPS hiz vermezse bu devreye girer.
+         */
+        private const val DEMIR_YARICAP_M = 40f
+
+        /** Demirden uzaklasma hareket sayilsin diye gereken ortalama hiz. */
+        private const val DEMIR_HIZ_MS = 3.0f
 
         /** En az bu araliklarla rotaya nokta yazilir (ms). */
         private const val POINT_INTERVAL_MS = 55_000L
 
         /** Ya da bu kadar yol alindiginda (metre). */
         private const val POINT_DISTANCE_M = 40f
+
+        /** Durgunken nokta yazma araligi - zikzak olusmasin diye seyrek. */
+        private const val DURGUN_NOKTA_ARALIGI_MS = 120_000L
 
         fun start(context: Context, autoStopAt: Long?) {
             val i = Intent(context, TrackingService::class.java).apply {
@@ -101,6 +138,16 @@ class TrackingService : Service(), LocationListener {
 
     /** startForeground() cagrildi mi. */
     private var onPlanda = false
+
+    // ---- hareket/durgunluk durumu ----
+    /** Su an hareket halinde miyiz. Durgunken mesafe hic artmaz. */
+    private var hareketHalinde = false
+    /** Durgunken demir attigimiz konum. */
+    private var demir: Location? = null
+    /** Hareket halindeyken yavaslamanin basladigi an. */
+    private var yavaslamaBasi = 0L
+    /** Durgunken en son ne zaman nokta yazdik. */
+    private var durgunNoktaZamani = 0L
 
     /** 20 saniyede bir: mesafeyi diske yaz, bildirimi tazele, otomatik bitisi kontrol et. */
     private val ticker = object : Runnable {
@@ -159,6 +206,16 @@ class TrackingService : Service(), LocationListener {
         return START_STICKY
     }
 
+
+    /** Hareket/durgunluk durumunu bastan baslat. */
+    private fun hareketDurumuSifirla() {
+        hareketHalinde = false
+        demir = null
+        yavaslamaBasi = 0L
+        durgunNoktaZamani = 0L
+        lastLocation = null
+    }
+
     // ------------------------------------------------------------- vardiya
 
     /**
@@ -185,7 +242,7 @@ class TrackingService : Service(), LocationListener {
 
         shiftId = repo.startShift(autoStop)
         totalDistanceM = 0.0
-        lastLocation = null
+        hareketDurumuSifirla()
         lastPointSavedAt = 0L
         distanceAtLastPoint = 0.0
         autoStopAt = autoStop
@@ -207,7 +264,7 @@ class TrackingService : Service(), LocationListener {
         shiftId = id
         totalDistanceM = distance
         autoStopAt = autoStop
-        lastLocation = null
+        hareketDurumuSifirla()
         distanceAtLastPoint = distance
 
         val saved = repo.points(id).map { LatLon(it.lat, it.lon) }
@@ -364,46 +421,122 @@ class TrackingService : Service(), LocationListener {
     override fun onLocationChanged(location: Location) {
         if (shiftId <= 0) return
 
-        // Dogrulugu kotu olan konumlari at.
+        // Dogrulugu kotu olan konumlari tamamen at: 25 m hatali bir olcum
+        // 25 mlik sahte hareket uretebilir.
         if (location.hasAccuracy() && location.accuracy > MAX_ACCURACY_M) return
 
         TrackerState.hasFix.value = true
         TrackerState.accuracyM.value = if (location.hasAccuracy()) location.accuracy else 0f
 
+        val hiz = if (location.hasSpeed()) location.speed else -1f
+
+        if (!hareketHalinde) {
+            durgunIsle(location, hiz)
+            return
+        }
+        hareketIsle(location, hiz)
+    }
+
+    /**
+     * Durgun haldeyiz: mesafe ARTMAZ.
+     *
+     * Hareket sayilmasi icin ya GPS net bir hiz bildirmeli, ya da demir
+     * attigimiz noktadan yeterince hizli uzaklasmis olmaliyiz. Ikinci sart
+     * yuruyerek saglanamaz - AVM icinde dolasmak bu yuzden kilometreye
+     * yazilmaz.
+     */
+    private fun durgunIsle(location: Location, hiz: Float) {
+        TrackerState.speedKmh.value = 0.0
+
+        val d = demir
+        if (d == null) {
+            demir = location
+            durgunNoktaZamani = System.currentTimeMillis()
+            savePoint(location)
+            return
+        }
+
+        val uzaklik = d.distanceTo(location)
+        val gecenSn = (location.time - d.time) / 1000.0
+        val ortHiz = if (gecenSn > 0) uzaklik / gecenSn else 0.0
+
+        val gercektenHareket = hiz >= BASLAMA_HIZI_MS ||
+            (uzaklik >= DEMIR_YARICAP_M && ortHiz >= DEMIR_HIZ_MS)
+
+        if (gercektenHareket) {
+            hareketHalinde = true
+            yavaslamaBasi = 0L
+            // Mesafeyi demirden itibaren say: bekleme suresince biriken
+            // titremeler atlanmis olur.
+            totalDistanceM += uzaklik
+            lastLocation = location
+            demir = null
+            TrackerState.distanceM.value = totalDistanceM
+            TrackerState.speedKmh.value =
+                if (hiz >= 0) hiz * 3.6 else ortHiz * 3.6
+            savePoint(location)
+            return
+        }
+
+        // Hala duruyoruz. Rotada "burada bekledim" izi kalsin diye seyrek
+        // aralikla, ama titreyen konumu degil DEMIRi yaziyoruz; boylece
+        // haritada zikzak olusmuyor.
+        val simdi = System.currentTimeMillis()
+        if (simdi - durgunNoktaZamani >= DURGUN_NOKTA_ARALIGI_MS) {
+            durgunNoktaZamani = simdi
+            savePoint(d)
+        }
+    }
+
+    /** Hareket halindeyiz: adimlari mesafeye ekle, yavaslarsak durgunlasla. */
+    private fun hareketIsle(location: Location, hiz: Float) {
         val prev = lastLocation
         if (prev == null) {
             lastLocation = location
-            savePoint(location)
-            TrackerState.speedKmh.value = 0.0
             return
         }
 
         val meters = prev.distanceTo(location)
         val seconds = (location.time - prev.time) / 1000.0
-
-        // Zaman geri gitmis ya da ayni an: yok say.
         if (seconds <= 0.0) return
 
         // Imkansiz siçrama (tunel cikisi, GPS hatasi): yok say.
         if (meters / seconds > MAX_SPEED_MS) return
 
-        // Duruyorken GPS titremesi mesafeye eklenmesin.
-        if (meters < MIN_STEP_M) {
-            TrackerState.speedKmh.value = 0.0
-            maybeSaveByTime(location)
-            return
+        // Adim, hem alt esikten hem de olcum hatasindan buyuk olmali.
+        // 10 mlik bir "hareket", olcum hatasi 15 m ise gurultudur.
+        val esik = maxOf(MIN_STEP_M, if (location.hasAccuracy()) location.accuracy else 0f)
+        if (meters >= esik) {
+            totalDistanceM += meters
+            lastLocation = location
+            TrackerState.distanceM.value = totalDistanceM
+
+            val movedSinceLastPoint = totalDistanceM - distanceAtLastPoint
+            val elapsed = System.currentTimeMillis() - lastPointSavedAt
+            if (movedSinceLastPoint >= POINT_DISTANCE_M || elapsed >= POINT_INTERVAL_MS) {
+                savePoint(location)
+            }
         }
 
-        totalDistanceM += meters
-        lastLocation = location
-        TrackerState.distanceM.value = totalDistanceM
         TrackerState.speedKmh.value =
-            if (location.hasSpeed()) location.speed * 3.6 else meters / seconds * 3.6
+            if (hiz >= 0) hiz * 3.6 else (meters / seconds * 3.6)
 
-        val movedSinceLastPoint = totalDistanceM - distanceAtLastPoint
-        val elapsed = System.currentTimeMillis() - lastPointSavedAt
-        if (movedSinceLastPoint >= POINT_DISTANCE_M || elapsed >= POINT_INTERVAL_MS) {
-            savePoint(location)
+        // Yavasladik mi? Bir sure yavas kalirsak tekrar durgunlasiyoruz.
+        val yavas = if (hiz >= 0) hiz < SURME_HIZI_MS else meters < MIN_STEP_M
+        if (yavas) {
+            if (yavaslamaBasi == 0L) {
+                yavaslamaBasi = location.time
+            } else if (location.time - yavaslamaBasi > DURMA_SURESI_MS) {
+                hareketHalinde = false
+                demir = location
+                lastLocation = null
+                yavaslamaBasi = 0L
+                durgunNoktaZamani = System.currentTimeMillis()
+                TrackerState.speedKmh.value = 0.0
+                savePoint(location)
+            }
+        } else {
+            yavaslamaBasi = 0L
         }
     }
 
