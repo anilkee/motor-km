@@ -20,6 +20,7 @@ const K = require('./kullanicilar');
 const S = require('./sayfalar');
 const R = require('./raporlar');
 const { TANITIM } = require('./tanitim');
+const { uygulamayaDon } = require('./donus');
 const { kacis, sayfa, tarih, sayi } = S;
 
 const KOK = __dirname;
@@ -467,7 +468,10 @@ const sunucu = http.createServer(async (istek, cevap) => {
     // ---- google web akisi ----
     if (yol === '/google/basla') {
       if (!googleVar) return git('/giris?hata=' + encodeURIComponent('Google girisi ayarlanmamis'));
-      const durum = K.rastgele(24);
+      // "uygulama=1" ise telefondan geliniyor: is bitince tarayici kapanip
+      // uygulamaya geri donmeli. Bunu durum degerinin sonuna isaretliyoruz.
+      const uygulama = url.searchParams.get('uygulama') === '1';
+      const durum = K.rastgele(24) + (uygulama ? '.u' : '.w');
       return git(googleAdres(durum), {
         'Set-Cookie': `gdurum=${durum}; HttpOnly; SameSite=Lax; Path=/; Secure; Max-Age=600`
       });
@@ -486,6 +490,18 @@ const sunucu = http.createServer(async (istek, cevap) => {
         const s = googleHesap(kimlik);
         if (s.hata) return git('/giris?hata=' + encodeURIComponent(s.hata));
         K.guncelle(s.kullanici.id, { sonGiris: Date.now() });
+
+        // Telefondan gelindiyse: cihaz anahtari uretip uygulamaya geri don.
+        // Boylece Android OAuth istemcisine hic ihtiyac kalmiyor.
+        if (String(durum).endsWith(".u")) {
+          const cihazAnahtari = K.cihazAnahtariUret(s.kullanici.id, "telefon (tarayici)");
+          const hedef = "seferdefteri://giris?anahtar=" + encodeURIComponent(cihazAnahtari) +
+            "&kullanici=" + encodeURIComponent(s.kullanici.kullaniciAdi);
+          return gonder(200, "text/html; charset=utf-8",
+            uygulamayaDon(hedef, s.kullanici.kullaniciAdi),
+            { "Set-Cookie": "gdurum=; HttpOnly; Path=/; Max-Age=0" });
+        }
+
         return git('/', {
           'Set-Cookie': [
             oturumCerezi(s.kullanici.id, true),

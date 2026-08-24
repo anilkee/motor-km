@@ -155,3 +155,44 @@ object Hesap {
         }
 
 }
+
+/**
+ * Tarayici uzerinden Google girisi.
+ *
+ * Neden bu yol: Credential Manager, Google Cloud'daki Android istemcisinin
+ * paket adi ve SHA-1 parmak iziyle birebir eslesmesini istiyor; en ufak
+ * uyusmazlikta "hesap bulunamadi" deyip duruyor. Tarayici yolu ise yalnizca
+ * WEB istemcisini kullanir - sitede zaten calisan akisin aynisi.
+ *
+ * Akis: tarayici acilir -> Google -> sunucu -> "seferdefteri://giris?anahtar=..."
+ * ile uygulamaya geri donulur.
+ */
+object GoogleTarayici {
+
+    fun baslat(context: android.content.Context): Boolean {
+        val adres = Prefs(context).sunucuAdresi.trimEnd('/') + "/google/basla?uygulama=1"
+        return try {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(adres))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Tarayicidan donen adresi isler. Anahtar varsa kaydedip true doner.
+     */
+    fun donusuIsle(context: android.content.Context, veri: android.net.Uri?): Boolean {
+        if (veri == null) return false
+        if (veri.scheme != "seferdefteri" || veri.host != "giris") return false
+        val anahtar = veri.getQueryParameter("anahtar")?.trim().orEmpty()
+        if (anahtar.isBlank()) return false
+        val prefs = Prefs(context)
+        prefs.cihazAnahtari = anahtar
+        prefs.kullaniciAdi = veri.getQueryParameter("kullanici")?.trim().orEmpty()
+        return true
+    }
+}

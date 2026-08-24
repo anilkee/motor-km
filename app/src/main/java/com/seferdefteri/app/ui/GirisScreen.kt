@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.scale
 import com.seferdefteri.app.sync.GoogleGiris
+import com.seferdefteri.app.sync.GoogleTarayici
 import com.seferdefteri.app.sync.GoogleSonuc
 import com.seferdefteri.app.sync.Hesap
 import com.seferdefteri.app.sync.HesapSonuc
@@ -80,6 +81,12 @@ fun GirisScreen(
     var hata by remember { mutableStateOf<String?>(null) }
     var bilgi by remember { mutableStateOf<String?>(null) }
 
+    /**
+     * Once telefondaki hesap secici (Credential Manager) denenir - daha hizli.
+     * O calismazsa tarayiciya dusulur: tarayici yolu Google Clouddaki Android
+     * istemcisine hic bakmaz, sadece web istemcisini kullanir, bu yuzden
+     * Credential Managerin takildigi durumlarda da calisir.
+     */
     fun googleIleGir() {
         hata = null
         bilgi = null
@@ -91,11 +98,19 @@ fun GirisScreen(
                         is HesapSonuc.Tamam -> onGirisTamam()
                         is HesapSonuc.Hata -> hata = s.mesaj
                     }
+                    calisiyor = false
                 }
-                GoogleSonuc.Vazgecildi -> Unit          // sessizce geri don
-                is GoogleSonuc.Hata -> hata = g.mesaj
+                GoogleSonuc.Vazgecildi -> calisiyor = false
+                is GoogleSonuc.Hata -> {
+                    // Telefondaki secici olmadi; tarayicidan devam et.
+                    bilgi = "Tarayici aciliyor..."
+                    if (!GoogleTarayici.baslat(ctx)) {
+                        bilgi = null
+                        hata = g.mesaj
+                    }
+                    calisiyor = false
+                }
             }
-            calisiyor = false
         }
     }
 

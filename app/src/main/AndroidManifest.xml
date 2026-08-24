@@ -38,6 +38,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              Tarayicidan Google girisi yapildiktan sonra sunucu buraya geri
+              yonlendiriyor: seferdefteri://giris?anahtar=...
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="seferdefteri" android:host="giris" />
+            </intent-filter>
         </activity>
 
         <service

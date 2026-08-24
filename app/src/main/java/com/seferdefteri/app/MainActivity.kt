@@ -60,18 +60,41 @@ import com.seferdefteri.app.ui.SummaryScreen
 import com.seferdefteri.app.update.CheckResult
 import com.seferdefteri.app.update.UpdateInfo
 import com.seferdefteri.app.update.Updater
+import androidx.compose.runtime.mutableStateOf as composeMutableStateOf
+import com.seferdefteri.app.sync.GoogleTarayici
 import com.seferdefteri.app.sync.Hesap
 import com.seferdefteri.app.sync.Yedekleyici
 import com.seferdefteri.app.ui.GirisScreen
+import com.seferdefteri.app.ui.IzinScreen
+import com.seferdefteri.app.ui.izinlerTamamMi
 
 class MainActivity : ComponentActivity() {
+
+    /** Tarayicidan Google girisiyle donuldugunde tetiklenir. */
+    private val tarayiciDonusu = mutableStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as KuryeApp
+        donusuIsle(intent)
         setContent {
             KuryeTheme {
-                AppRoot(app.repo, app.prefs)
+                AppRoot(app.repo, app.prefs, tarayiciDonusu.value)
             }
+        }
+    }
+
+    // launchMode="singleTop": uygulama acikken donuldugunde onCreate degil
+    // burasi calisir.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        donusuIsle(intent)
+    }
+
+    private fun donusuIsle(intent: Intent?) {
+        if (GoogleTarayici.donusuIsle(this, intent?.data)) {
+            tarayiciDonusu.value = tarayiciDonusu.value + 1
         }
     }
 }
@@ -100,11 +123,23 @@ private fun gpsAcikMi(ctx: Context): Boolean {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppRoot(repo: Repo, prefs: Prefs) {
+fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
     val girisCtx = LocalContext.current
     var girisYapildi by remember { mutableStateOf(Hesap.girisYapildiMi(girisCtx)) }
+    // Tarayicidan giris yapilip donuldugunde durumu tazele.
+    LaunchedEffect(tarayiciDonusu) {
+        if (tarayiciDonusu > 0) girisYapildi = Hesap.girisYapildiMi(girisCtx)
+    }
     if (!girisYapildi) {
         GirisScreen(onGirisTamam = { girisYapildi = true })
+        return
+    }
+
+    // Girisin hemen ardindan izinleri iste. Sistemin izin penceresinden once
+    // neyin neden istendigi anlatilir; Play bunu zorunlu tutuyor.
+    var izinSorusu by remember { mutableStateOf(!izinlerTamamMi(girisCtx)) }
+    if (izinSorusu) {
+        IzinScreen(onTamam = { izinSorusu = false })
         return
     }
 
