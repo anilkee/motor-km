@@ -115,8 +115,13 @@ $etiket = "v$yeniAd"
 # ------------------------------------------------- GitHub surumu olustur
 Yaz "2/4  GitHub surumu olusturuluyor ($etiket)..." Cyan
 Push-Location $kok
-& gh release create $etiket $hedef --repo $repo --title $etiket --notes $Aciklama 2>&1 | Out-Host
+# Aciklama cok satirli olabiliyor ve tirnak icerebiliyor; komut satirinda
+# gecirilince gh parcaliyor. Dosyadan okutmak tek guvenli yol.
+$notDosya = Join-Path $env:TEMP "sefer-notlar.txt"
+[System.IO.File]::WriteAllText($notDosya, $Aciklama, (New-Object System.Text.UTF8Encoding($false)))
+& gh release create $etiket $hedef --repo $repo --title $etiket --notes-file $notDosya 2>&1 | Out-Host
 $relKod = $LASTEXITCODE
+Remove-Item $notDosya -Force -ErrorAction SilentlyContinue
 Pop-Location
 
 if ($relKod -ne 0) {

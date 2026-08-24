@@ -3,6 +3,7 @@ package com.seferdefteri.app
 import android.app.Application
 import android.content.Context
 import com.seferdefteri.app.data.Repo
+import com.seferdefteri.app.data.olcumleriSil
 import org.osmdroid.config.Configuration
 import java.io.File
 
@@ -17,6 +18,14 @@ class KuryeApp : Application() {
         super.onCreate()
         repo = Repo(this)
         prefs = Prefs(this)
+
+        // 1.10 oncesindeki kayitlar GPS suruklemesi yuzunden sisik kilometre
+        // iceriyor. Yanlis veriyle dogru veriyi karistirmamak icin yukseltmede
+        // bir kez temizleniyor. Yeni kurulumlarda zaten silinecek bir sey yok.
+        if (!prefs.eskiKayitlarTemizlendi) {
+            repo.olcumleriSil()
+            prefs.eskiKayitlarTemizlendi = true
+        }
 
         // Harita onbellegi uygulama ici klasorde tutulur; boylece
         // depolama izni istemeye gerek kalmaz.

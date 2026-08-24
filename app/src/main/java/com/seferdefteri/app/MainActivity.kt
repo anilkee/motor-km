@@ -321,7 +321,11 @@ fun AppRoot(repo: Repo, prefs: Prefs, tarayiciDonusu: Int = 0) {
                         onStart = { vardiyaBaslat(it) },
                         onStop = { TrackingService.stop(ctx) },
                         onPaket = { TrackingService.paketEkle(ctx) },
-                        onPaketGeriAl = { TrackingService.paketGeriAl(ctx) }
+                        onPaketGeriAl = { TrackingService.paketGeriAl(ctx) },
+                        onKazanc = { tutar ->
+                            // Az once biten vardiya: en son kapanan kayit.
+                            repo.shifts(1).firstOrNull()?.let { repo.setKazanc(it.id, tutar) }
+                        }
                     )
                     1 -> FuelScreen(repo = repo, prefs = prefs)
                     2 -> HistoryScreen(repo = repo)

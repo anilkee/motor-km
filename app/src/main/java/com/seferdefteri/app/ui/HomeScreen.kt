@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.seferdefteri.app.Prefs
@@ -61,6 +64,7 @@ fun HomeScreen(
     onStop: () -> Unit,
     onPaket: () -> Unit,
     onPaketGeriAl: () -> Unit,
+    onKazanc: (Double?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val calisiyor by TrackerState.running.collectAsState()
@@ -88,6 +92,8 @@ fun HomeScreen(
     var secilenSaat by remember { mutableStateOf(prefs.autoStopHour) }
     var secilenDk by remember { mutableStateOf(prefs.autoStopMinute) }
     var bitirOnayi by remember { mutableStateOf(false) }
+    var kazancSorusu by remember { mutableStateOf(false) }
+    var kazancMetin by remember { mutableStateOf("") }
 
     val gecenSure = if (calisiyor && basladi > 0) simdi - basladi else 0L
     val km = mesafeM / 1000.0
@@ -341,10 +347,56 @@ fun HomeScreen(
                 TextButton(onClick = {
                     bitirOnayi = false
                     onStop()
+                    kazancSorusu = true
                 }) { Text("Bitir") }
             },
             dismissButton = {
                 TextButton(onClick = { bitirOnayi = false }) { Text("Devam et") }
+            }
+        )
+    }
+
+    // -------------------------------------------------- gunluk kazanc
+    if (kazancSorusu) {
+        val deger = parseSayi(kazancMetin)
+        AlertDialog(
+            onDismissRequest = { kazancSorusu = false },
+            title = { Text("Bugun ne kadar kazandin?") },
+            text = {
+                Column {
+                    Text(
+                        "Gun sonu kazancini yazarsan net kazancini, saatlik kazancini " +
+                            "ve hangi gunun daha karli oldugunu hesaplayabilirim.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = kazancMetin,
+                        onValueChange = { kazancMetin = it },
+                        label = { Text("Kazanc") },
+                        suffix = { Text("TL") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = deger != null && deger >= 0.0,
+                    onClick = {
+                        onKazanc(deger)
+                        kazancMetin = ""
+                        kazancSorusu = false
+                    }
+                ) { Text("Kaydet") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    kazancMetin = ""
+                    kazancSorusu = false
+                }) { Text("Simdi girme") }
             }
         )
     }

@@ -7,7 +7,9 @@ data class Shift(
     val endTime: Long?,          // null ise vardiya hala devam ediyor
     val distanceM: Double,
     val autoStopAt: Long?,       // otomatik bitis zamani (epoch ms), yoksa null
-    val note: String?
+    val note: String?,
+    /** Vardiya bitince girilen gunluk kazanc (TL). */
+    val kazanc: Double? = null
 ) {
     val km: Double get() = distanceM / 1000.0
     val isActive: Boolean get() = endTime == null
@@ -106,8 +108,23 @@ data class Summary(
     val liters: Double,
     val costTry: Double,
     val shiftCount: Int,
-    val activeMs: Long
+    val activeMs: Long,
+    /** Girilen gunluk kazanclarin toplami. */
+    val kazanc: Double = 0.0,
+    /** Kazanc girilmis vardiya sayisi. */
+    val kazancliVardiya: Int = 0
 ) {
+    /**
+     * Saatlik kazanc. Cok kisa surelerde bolum sacma buyuk cikiyor
+     * (1 dakikalik vardiyada 100 bin TL gibi); 15 dakikanin altinda
+     * hesaplamiyoruz, ekran da 0 olunca satiri gostermiyor.
+     */
+    val saatlikKazanc: Double
+        get() {
+            val h = activeMs / 3_600_000.0
+            return if (h >= 0.25) kazanc / h else 0.0
+        }
+
     /** 100 km'de kac litre. */
     val litersPer100Km: Double get() = if (km > 0.0) liters / km * 100.0 else 0.0
     /** 1 litre ile kac km. */

@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 internal class Db(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 2) {
+    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 4) {
 
     override fun onCreate(db: SQLiteDatabase) {
         surum2Tablolari(db)
@@ -18,6 +18,7 @@ internal class Db(context: Context) :
                 "end_time INTEGER," +
                 "distance_m REAL NOT NULL DEFAULT 0," +
                 "auto_stop INTEGER," +
+                "kazanc REAL," +
                 "note TEXT)"
         )
         db.execSQL(
@@ -45,6 +46,14 @@ internal class Db(context: Context) :
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Veri asla silinmez; sadece eksik tablolar eklenir.
         if (oldVersion < 2) surum2Tablolari(db)
+        if (oldVersion < 4) surum3Alanlari(db)   // eski kurulumlarda kazanc sutunu yok
+    }
+
+    /** Gunluk kazanc alani (sema surumu 3). */
+    private fun surum3Alanlari(db: SQLiteDatabase) {
+        // Yeni kurulumlarda sutun CREATE TABLE ile geliyor; burasi sadece
+        // yukseltme yolu. Zaten varsa ALTER hata verir, yutuyoruz.
+        runCatching { db.execSQL("ALTER TABLE shifts ADD COLUMN kazanc REAL") }
     }
 
     /** Paket ve bakim tablolari (sema surumu 2 ile geldi). */
@@ -124,6 +133,14 @@ class Repo(context: Context) {
     fun setAutoStop(id: Long, autoStopAt: Long?) {
         val v = ContentValues().apply {
             if (autoStopAt != null) put("auto_stop", autoStopAt) else putNull("auto_stop")
+        }
+        db.update("shifts", v, "id=?", arrayOf(id.toString()))
+    }
+
+    /** Vardiya bitince girilen gunluk kazanc. */
+    fun setKazanc(id: Long, kazanc: Double?) {
+        val v = ContentValues().apply {
+            if (kazanc != null) put("kazanc", kazanc) else putNull("kazanc")
         }
         db.update("shifts", v, "id=?", arrayOf(id.toString()))
     }
@@ -306,7 +323,9 @@ class Repo(context: Context) {
             liters = fuels.sumOf { it.liters },
             costTry = fuels.sumOf { it.priceTry },
             shiftCount = shifts.size,
-            activeMs = shifts.sumOf { it.durationMs }
+            activeMs = shifts.sumOf { it.durationMs },
+            kazanc = shifts.sumOf { it.kazanc ?: 0.0 },
+            kazancliVardiya = shifts.count { it.kazanc != null }
         )
     }
 
@@ -413,6 +432,8 @@ class Repo(context: Context) {
                 y.name("baslangic").value(c.getLong(c.getColumnIndexOrThrow("start_time")))
                 if (c.isNull(bitis)) y.name("bitis").nullValue() else y.name("bitis").value(c.getLong(bitis))
                 y.name("mesafeM").value(c.getDouble(c.getColumnIndexOrThrow("distance_m")))
+                val kz = c.getColumnIndex("kazanc")
+                if (kz >= 0 && !c.isNull(kz)) y.name("kazanc").value(c.getDouble(kz))
                 y.endObject()
             }
         }
@@ -482,7 +503,8 @@ class Repo(context: Context) {
         endTime = getColumnIndexOrThrow("end_time").let { if (isNull(it)) null else getLong(it) },
         distanceM = getDouble(getColumnIndexOrThrow("distance_m")),
         autoStopAt = getColumnIndexOrThrow("auto_stop").let { if (isNull(it)) null else getLong(it) },
-        note = getColumnIndexOrThrow("note").let { if (isNull(it)) null else getString(it) }
+        note = getColumnIndexOrThrow("note").let { if (isNull(it)) null else getString(it) },
+        kazanc = getColumnIndex("kazanc").let { if (it < 0 || isNull(it)) null else getDouble(it) }
     )
 
     private fun Cursor.toPoint() = TrackPoint(
@@ -548,11 +570,12 @@ fun Repo.iceAktar(veri: org.json.JSONObject): Int {
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
                 db.execSQL(
-                    "INSERT INTO shifts (id, start_time, end_time, distance_m) VALUES (?,?,?,?)",
+                    "INSERT INTO shifts (id, start_time, end_time, distance_m, kazanc) VALUES (?,?,?,?,?)",
                     arrayOf<Any?>(
                         o.getLong("id"), o.getLong("baslangic"),
                         if (o.isNull("bitis")) null else o.getLong("bitis"),
-                        o.optDouble("mesafeM", 0.0)
+                        o.optDouble("mesafeM", 0.0),
+                        if (o.has("kazanc") && !o.isNull("kazanc")) o.getDouble("kazanc") else null
                     )
                 )
                 satir++
@@ -610,4 +633,31 @@ fun Repo.iceAktar(veri: org.json.JSONObject): Int {
         }
     }
     return satir
+}
+
+/**
+ * Olcum kayitlarini siler ama bakim hatirlaticilarinin kendisini birakir.
+ * Bakim kilometreleri toplam km'ye gore hesaplandigi icin, toplam sifirlaninca
+ * onlarin da baslangici sifira cekilir; yoksa hatirlatici bir daha hic dolmaz.
+ * Tarih bazli olanlar (muayene, sigorta) oldugu gibi kalir.
+ */
+fun Repo.olcumleriSil() {
+    yaz { db ->
+        db.execSQL("DELETE FROM points")
+        db.execSQL("DELETE FROM deliveries")
+        db.execSQL("DELETE FROM shifts")
+        db.execSQL("DELETE FROM fuel")
+        db.execSQL("UPDATE maintenance SET son_km = 0")
+    }
+}
+
+/** Telefondaki tum kayitlari siler. Hesap ve sunucudaki yedek etkilenmez. */
+fun Repo.hepsiniSil() {
+    yaz { db ->
+        db.execSQL("DELETE FROM points")
+        db.execSQL("DELETE FROM deliveries")
+        db.execSQL("DELETE FROM shifts")
+        db.execSQL("DELETE FROM fuel")
+        db.execSQL("DELETE FROM maintenance")
+    }
 }

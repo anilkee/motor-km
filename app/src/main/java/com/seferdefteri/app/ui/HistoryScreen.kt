@@ -123,6 +123,13 @@ fun HistoryScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        v.kazanc?.let {
+                            Text(
+                                lira(it),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -181,6 +188,9 @@ private fun ShiftDetail(
                 StatBox("Sure", sure(shift.durationMs), modifier = Modifier.weight(1f))
                 StatBox("Ortalama", sayi(shift.avgKmh, 0) + " km/s", modifier = Modifier.weight(1f))
                 StatBox("Paket", "${paketler.size}", modifier = Modifier.weight(1f))
+                shift.kazanc?.let {
+                    StatBox("Kazanc", lira(it), modifier = Modifier.weight(1f))
+                }
             }
 
             // harita

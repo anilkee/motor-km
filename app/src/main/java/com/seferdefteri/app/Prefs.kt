@@ -72,6 +72,14 @@ class Prefs(context: Context) {
         get() = sp.getFloat("last_liter_price", 0f)
         set(v) = sp.edit().putFloat("last_liter_price", v).apply()
 
+    /**
+     * 1.10 oncesi surumlerde GPS suruklemesi kilometreyi sisiriyordu.
+     * O kayitlar yanlis oldugu icin yukseltmede bir kez siliniyor.
+     */
+    var eskiKayitlarTemizlendi: Boolean
+        get() = sp.getBoolean("temizlik_1_10", false)
+        set(v) = sp.edit().putBoolean("temizlik_1_10", v).apply()
+
     companion object {
         /**
          * Guncelleme adresi: "yayinla.ps1" bu dosyayi uretip GitHub'a yollar.

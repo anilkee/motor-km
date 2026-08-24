@@ -1,6 +1,6 @@
 {
-    "versionCode":  11,
-    "versionName":  "1.10",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.10/sefer-defteri-1.10.apk",
-    "notes":  "Kilometre olcumu duzeltildi. Paket beklerken GPS titremesi kilometreye ekleniyordu; gercek bir vardiyada 55 km\u0027nin 11 km\u0027si sahteydi. Artik dururken hic artmiyor, AVM icinde yuruyerek dolasmak da sayilmiyor. Haritadaki zikzak da bitti."
+    "versionCode":  12,
+    "versionName":  "1.11",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.11/sefer-defteri-1.11.apk",
+    "notes":  "Gunluk kazanc takibi geldi. Vardiyayi bitirince gunluk kazancini soruyor; girdigin tutar Ozet ve Gecmis ekranlarinda gunluk, haftalik, aylik ve tum zamanlar olarak toplaniyor. Yakit gideri dusulup net kazanc, km basina ve paket basina kazanc da cikiyor. Ayni ozet web panelinde de var.\n\nBu surumde telefondaki eski kayitlar bir kez siliniyor, cunku onlarin kilometresi GPS suruklemesi yuzunden sisikti. Bakim hatirlaticilarin duruyor."
 }

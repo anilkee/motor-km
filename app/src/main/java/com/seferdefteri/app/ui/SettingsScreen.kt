@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,6 +51,7 @@ import com.seferdefteri.app.update.CheckResult
 import com.seferdefteri.app.update.UpdateInfo
 import com.seferdefteri.app.update.Updater
 import com.seferdefteri.app.sync.YedekSonuc
+import com.seferdefteri.app.data.hepsiniSil
 import com.seferdefteri.app.sync.Hesap
 import com.seferdefteri.app.sync.HesapSonuc
 import com.seferdefteri.app.sync.Yedekleyici
@@ -89,6 +91,8 @@ fun SettingsScreen(
     var silmeOnayi by remember { mutableStateOf(false) }
     var siliniyor by remember { mutableStateOf(false) }
     var silmeMesaj by remember { mutableStateOf<String?>(null) }
+    var kayitSilOnayi by remember { mutableStateOf(false) }
+    var kayitSilMesaj by remember { mutableStateOf<String?>(null) }
     var geriYukleOnayi by remember { mutableStateOf(false) }
     var geriYukleniyor by remember { mutableStateOf(false) }
 
@@ -399,6 +403,30 @@ fun SettingsScreen(
             )
         }
 
+        // --------------------------------------------- telefondaki kayitlar
+        SectionCard("Telefondaki kayitlar") {
+            Text(
+                "Vardiya, konum, paket, yakit ve bakim kayitlarini telefondan siler. " +
+                    "Hesabin ve sunucudaki yedegin durur - istersen sonra geri yuklersin.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { kayitSilOnayi = true },
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Filled.DeleteSweep, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Kayitlari sifirla")
+            }
+            kayitSilMesaj?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
         // ------------------------------------------------------ hesabi sil
         SectionCard("Hesabi sil") {
             Text(
@@ -507,6 +535,29 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { geriYukleOnayi = false }) { Text("Vazgec") }
+            }
+        )
+    }
+
+    if (kayitSilOnayi) {
+        AlertDialog(
+            onDismissRequest = { kayitSilOnayi = false },
+            title = { Text("Kayitlar sifirlansin mi?") },
+            text = {
+                Text(
+                    "Telefondaki butun vardiya, konum, paket, yakit ve bakim kayitlari " +
+                        "silinecek. Hesabin ve sunucudaki yedegin etkilenmez."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    kayitSilOnayi = false
+                    com.seferdefteri.app.data.Repo(ctx).hepsiniSil()
+                    kayitSilMesaj = "Kayitlar silindi."
+                }) { Text("Sifirla") }
+            },
+            dismissButton = {
+                TextButton(onClick = { kayitSilOnayi = false }) { Text("Vazgec") }
             }
         )
     }

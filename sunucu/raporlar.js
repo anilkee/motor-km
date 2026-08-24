@@ -50,7 +50,9 @@ function ozetCikar(veri, bas, son) {
     litre: yakit.reduce((t, y) => t + (y.litre || 0), 0),
     tutar: yakit.reduce((t, y) => t + (y.tutar || 0), 0),
     sureMs: vardiyalar.reduce((t, v) => t + ((v.bitis || Date.now()) - v.baslangic), 0),
-    paketSayisi: paketler.length
+    paketSayisi: paketler.length,
+    kazanc: vardiyalar.reduce((t, v) => t + (v.kazanc || 0), 0),
+    kazancliVardiya: vardiyalar.filter(v => v.kazanc != null).length
   };
 }
 
@@ -108,6 +110,29 @@ function ozet(veri, q, kullanici) {
       <p style="color:var(--soluk);margin:0">Hesap için en az iki dolum gerekiyor.
       İlk dolum sadece başlangıç işareti olarak kullanılır.</p></div>`;
 
+  let kazancKart = "";
+  if (o.kazanc > 0) {
+    const yakitGider = t ? o.km * t.tlKm : o.tutar;
+    const net = o.kazanc - yakitGider;
+    // 15 dakikanin altinda bolum sacma buyuk cikiyor; uygulamayla ayni esik.
+    const saatlik = o.sureMs >= 900000 ? o.kazanc / (o.sureMs / 3600000) : 0;
+    kazancKart = `<div class="kart"><h2>Kazanc</h2>
+      <div class="izgara">
+        ${olcu("Kazanc", lira(o.kazanc))}
+        ${olcu("Yakit gideri", lira(yakitGider))}
+        ${olcu("Net", lira(net))}
+        ${saatlik > 0 ? olcu("Saatlik", lira(saatlik)) : ""}
+      </div>
+      <div class="satirlar" style="margin-top:14px">
+        ${o.paketSayisi ? `<div><span>Paket basina</span><span>${lira(o.kazanc / o.paketSayisi)}</span></div>` : ""}
+        ${o.km > 0 ? `<div><span>Km basina</span><span>${lira(o.kazanc / o.km)}</span></div>` : ""}
+      </div>
+      ${o.kazancliVardiya < o.vardiyalar.length
+        ? `<div class="notlar">${o.vardiyalar.length} vardiyanin ${o.kazancliVardiya} tanesine kazanc girilmis.</div>`
+        : ""}
+    </div>`;
+  }
+
   const gunluk = {};
   for (const v of o.vardiyalar) {
     const g = new Date(v.baslangic);
@@ -136,6 +161,7 @@ ${donemCubugu(secim)}
   ${olcu('Direksiyonda', sure(o.sureMs))}
   ${olcu('Yakıt harcaması', o.litre > 0 ? lira(o.tutar) : '-', o.litre > 0 ? sayi(o.litre, 2) + ' L' : '')}
 </div></div>
+${kazancKart}
 ${tuketimKart}
 <div class="kart"><h2>Gün gün</h2>
   ${gunSatir ? `<table><tr><th>Gün</th><th class="sag">Mesafe</th><th class="sag">Paket</th>
@@ -263,7 +289,8 @@ function csv(veri) {
       new Date(v.baslangic).toLocaleDateString(S.TR), saat(v.baslangic),
       v.bitis ? saat(v.bitis) : '',
       ((v.mesafeM || 0) / 1000).toFixed(2).replace('.', ','),
-      paketSay[v.id] || 0, Math.round(ms / 60000)
+      paketSay[v.id] || 0, Math.round(ms / 60000),
+      v.kazanc != null ? v.kazanc.toFixed(2).replace(".", ",") : ""
     ]);
   }
   return '﻿' + satirlar.map(r => r.join(';')).join('\r\n');

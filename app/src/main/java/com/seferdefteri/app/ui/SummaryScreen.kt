@@ -64,9 +64,14 @@ fun SummaryScreen(
     val gunluk = remember(aralik) {
         vardiyalar.groupBy { gunBasi(it.startTime) }
             .map { (gun, liste) ->
-                Triple(gun, liste.sumOf { it.km }, liste.sumOf { it.durationMs })
+                GunOzeti(
+                    gun = gun,
+                    km = liste.sumOf { it.km },
+                    ms = liste.sumOf { it.durationMs },
+                    kazanc = liste.sumOf { it.kazanc ?: 0.0 }
+                )
             }
-            .sortedByDescending { it.first }
+            .sortedByDescending { it.gun }
     }
 
     LazyColumn(
@@ -144,6 +149,54 @@ fun SummaryScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------ kazanc
+        if (ozet.kazanc > 0.0) {
+            item {
+                SectionCard("Kazanc") {
+                    val yakitGider = if (tuketim.gecerli) ozet.km * tuketim.tryPerKm else ozet.costTry
+                    val net = ozet.kazanc - yakitGider
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatBox("Kazanc", lira(ozet.kazanc), modifier = Modifier.weight(1f))
+                        StatBox(
+                            "Yakit gideri", lira(yakitGider),
+                            renk = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatBox(
+                            "Net", lira(net),
+                            renk = if (net >= 0) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(4.dp))
+                    if (ozet.saatlikKazanc > 0.0) {
+                        SatirDeger("Saatlik kazanc", lira(ozet.saatlikKazanc))
+                    }
+                    if (paketSayisi > 0) {
+                        SatirDeger("Paket basina", lira(ozet.kazanc / paketSayisi))
+                    }
+                    if (ozet.km > 0) {
+                        SatirDeger("Km basina", lira(ozet.kazanc / ozet.km))
+                    }
+                    if (ozet.kazancliVardiya < ozet.shiftCount) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "${ozet.shiftCount} vardiyanin ${ozet.kazancliVardiya} tanesine kazanc girilmis; " +
+                                "digerleri hesaba katilmadi.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
                 }
             }
@@ -258,7 +311,7 @@ fun SummaryScreen(
                 )
             }
         } else {
-            items(gunluk, key = { it.first }) { (gun, kmToplam, sureToplam) ->
+            items(gunluk, key = { it.gun }) { g ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -270,22 +323,28 @@ fun SummaryScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(tarihUzun(gun), style = MaterialTheme.typography.bodyLarge)
+                            Text(tarihUzun(g.gun), style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                sure(sureToplam),
+                                sure(g.ms),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                kmDeger(kmToplam) + " km",
+                                kmDeger(g.km) + " km",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            if (tuketim.gecerli) {
+                            if (g.kazanc > 0.0) {
                                 Text(
-                                    "~" + lira(kmToplam * tuketim.tryPerKm) + " yakit",
+                                    lira(g.kazanc) + " kazanc",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else if (tuketim.gecerli) {
+                                Text(
+                                    "~" + lira(g.km * tuketim.tryPerKm) + " yakit",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -299,3 +358,11 @@ fun SummaryScreen(
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
+
+/** Gun gun tablosunun tek satiri. */
+private data class GunOzeti(
+    val gun: Long,
+    val km: Double,
+    val ms: Long,
+    val kazanc: Double
+)
