@@ -1,6 +1,6 @@
 {
-    "versionCode":  7,
-    "versionName":  "1.6",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.6/sefer-defteri-1.6.apk",
-    "notes":  "Uygulamanin adi Sefer Defteri oldu. Artik kullanici adi + sifre ya da Google ile giris yapiliyor; bir kez girdikten sonra cikis yapana kadar sormaz. Kayitlarin sunucudaki hesabina yedekleniyor, bilgisayardan sefer-defteri.duckdns.org adresinden raporlara ve tum rotalara bakabilirsin."
+    "versionCode":  8,
+    "versionName":  "1.7",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.7/sefer-defteri-1.7.apk",
+    "notes":  "Google ile giris takilmasi giderildi. Paket adi com.seferdefteri.app oldu (Play Store icin kalici ad). Yedekten geri yukleme eklendi: telefon degistirdiginde kayitlarini geri alabilirsin. Hesabini uygulama icinden silebilirsin. Play surumu ayri uretiliyor."
 }

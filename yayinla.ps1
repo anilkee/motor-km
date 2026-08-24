@@ -86,7 +86,7 @@ if (Test-Path (Join-Path $kok "gradlew.bat")) { $gradle = Join-Path $kok "gradle
 
 Yaz "1/4  APK derleniyor..." Cyan
 Push-Location $kok
-& $gradle --console=plain -q assembleRelease
+& $gradle --console=plain -q assembleDogrudanRelease
 $kod = $LASTEXITCODE
 Pop-Location
 
@@ -96,7 +96,9 @@ if ($kod -ne 0) {
     exit 1
 }
 
-$kaynak = Join-Path $kok "app\build\outputs\apk\release\app-release.apk"
+# "dogrudan" cesidi: elden dagitilan, kendini guncelleyebilen surum.
+# Play surumu ayri uretilir (assemblePlayRelease) ve buraya girmez.
+$kaynak = Join-Path $kok "app\build\outputs\apk\dogrudan\release\app-dogrudan-release.apk"
 if (-not (Test-Path $kaynak)) {
     Yaz "APK bulunamadi: $kaynak" Red
     SurumuGeriAl

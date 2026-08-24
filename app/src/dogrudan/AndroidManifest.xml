@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Bu izin YALNIZCA elden dagitilan APK surumunde var.
+      Uygulama kendi guncellemesini indirip kurabilsin diye gerekli.
+
+      Play surumunde bilerek YOK: Google Play politikasi, Play'den dagitilan
+      bir uygulamanin kendini Play disinda guncellemesini yasakliyor.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>

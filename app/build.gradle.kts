@@ -16,11 +16,11 @@ val appVersionCode = (versionProps.getProperty("versionCode") ?: "1").trim().toI
 val appVersionName = (versionProps.getProperty("versionName") ?: "1.0").trim()
 
 android {
-    namespace = "com.kurye.takip"
+    namespace = "com.seferdefteri.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.kurye.takip"
+        applicationId = "com.seferdefteri.app"
         minSdk = 24
         targetSdk = 35
         versionCode = appVersionCode
@@ -47,6 +47,25 @@ android {
                 keyAlias = ksProps.getProperty("keyAlias")
                 keyPassword = ksProps.getProperty("keyPassword")
             }
+        }
+    }
+
+    // İki dagitim kanali, tek kod:
+    //
+    //   dogrudan -> APK olarak elden dagitilan surum. Kendi kendini gunceller.
+    //   play     -> Google Play surumu. Kendini GUNCELLEMEZ ve
+    //               REQUEST_INSTALL_PACKAGES iznini istemez; Play politikasi
+    //               uygulamanin Play disinda kendini guncellemesini yasakliyor,
+    //               aksi halde uygulama reddedilir.
+    flavorDimensions += "dagitim"
+    productFlavors {
+        create("dogrudan") {
+            dimension = "dagitim"
+            buildConfigField("boolean", "KENDI_GUNCELLER", "true")
+        }
+        create("play") {
+            dimension = "dagitim"
+            buildConfigField("boolean", "KENDI_GUNCELLER", "false")
         }
     }
 

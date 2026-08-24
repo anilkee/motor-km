@@ -19,6 +19,7 @@ const crypto = require('crypto');
 const K = require('./kullanicilar');
 const S = require('./sayfalar');
 const R = require('./raporlar');
+const { TANITIM } = require('./tanitim');
 const { kacis, sayfa, tarih, sayi } = S;
 
 const KOK = __dirname;
@@ -372,6 +373,32 @@ const sunucu = http.createServer(async (istek, cevap) => {
         });
       }
 
+      // Telefon degistiginde ya da uygulama silinip yeniden kuruldugunda
+      // kayitlari geri almak icin.
+      if (yol === '/api/geri-yukle' && istek.method === 'GET') {
+        const yetki = istek.headers.authorization || '';
+        const anahtar = yetki.startsWith('Bearer ') ? yetki.slice(7) : '';
+        const u = K.cihazAnahtariIleBul(anahtar);
+        if (!u) return json(401, { hata: 'Cihaz anahtari gecersiz' });
+        const veri = veriOku(u.id);
+        if (!veri) return json(404, { hata: 'Bu hesapta yedek yok' });
+        const govde = Buffer.from(JSON.stringify(veri), 'utf8');
+        return gonder(200, 'application/json; charset=utf-8', zlib.gzipSync(govde), {
+          'Content-Encoding': 'gzip'
+        });
+      }
+
+      // Play politikasi: hesap acabilen uygulama, hesabi uygulama icinden
+      // silebilmeyi de sunmak zorunda. Silme geri alinamaz.
+      if (yol === '/api/hesap-sil' && istek.method === 'POST') {
+        const yetki = istek.headers.authorization || '';
+        const anahtar = yetki.startsWith('Bearer ') ? yetki.slice(7) : '';
+        const u = K.cihazAnahtariIleBul(anahtar);
+        if (!u) return json(401, { hata: 'Cihaz anahtari gecersiz' });
+        K.sil(u.id);
+        return json(200, { durum: 'silindi' });
+      }
+
       if (yol === '/api/yedek' && istek.method === 'POST') {
         const yetki = istek.headers.authorization || '';
         const anahtar = yetki.startsWith('Bearer ') ? yetki.slice(7) : '';
@@ -390,6 +417,8 @@ const sunucu = http.createServer(async (istek, cevap) => {
     }
 
     // ================================================== herkese acik
+    // Kok adres: giris yapilmamissa tanitim sayfasi (Google onay ekrani bunu istiyor).
+    if (yol === '/' && !oturumCoz(cerezOku(istek, 'oturum'))) return html(TANITIM);
     if (yol === '/gizlilik') return html(GIZLILIK);
     if (yol === '/kosullar') return html(KOSULLAR);
 
