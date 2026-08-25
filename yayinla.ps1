@@ -166,7 +166,27 @@ function Git-Calistir([string[]]$Argumanlar) {
 }
 
 Git-Calistir @('add', '-A') | Out-Null
-Git-Calistir @('commit', '-q', '-m', "Surum $yeniAd - $Aciklama") | Out-Null
+
+# Commit mesajini dosyadan veriyoruz: aciklama cok satirli olabiliyor ve
+# -m ile gecirilince git bozuk arguman aliyor, commit sessizce basarisiz
+# oluyordu. Sonra push'un gonderecegi sey kalmadigi icin 0 donuyor ve
+# betik "yayinlandi" diyordu; telefon ise eski surumu goruyordu.
+$mesajDosya = Join-Path $env:TEMP "sefer-commit.txt"
+[System.IO.File]::WriteAllText(
+    $mesajDosya,
+    "Surum $yeniAd ($yeniKod)`n`n$Aciklama",
+    (New-Object System.Text.UTF8Encoding($false))
+)
+$commitKod = Git-Calistir @('commit', '-q', '-F', $mesajDosya)
+Remove-Item $mesajDosya -Force -ErrorAction SilentlyContinue
+
+if ($commitKod -ne 0) {
+    Yaz "UYARI: git commit basarisiz. GitHub surumu olustu ama guncelleme.json" Yellow
+    Yaz "gonderilemedi; telefon yeni surumu goremez." Yellow
+    Pop-Location
+    exit 1
+}
+
 $pushKod = Git-Calistir @('push', '-q', 'origin', 'main')
 Pop-Location
 
@@ -174,6 +194,21 @@ if ($pushKod -ne 0) {
     Yaz "UYARI: git push basarisiz. GitHub surumu olustu ama guncelleme.json" Yellow
     Yaz "gonderilemedi; telefon yeni surumu goremez. 'git push' u elle dene." Yellow
     exit 1
+}
+
+# Son kontrol: telefonun okudugu dosya gercekten yeni surumu gosteriyor mu.
+# Bu adim olmadan, yukaridaki bir hata sessizce gecerse fark edilmiyor.
+$uzak = ""
+try {
+    $uzak = (& gh api "repos/$repo/contents/yayin/guncelleme.json?ref=main" -q '.content' 2>$null)
+} catch { }
+if ($uzak) {
+    $cozulmus = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($uzak -replace '\s', '')))
+    if ($cozulmus -notmatch "`"versionCode`"\s*:\s*$yeniKod\b") {
+        Yaz "UYARI: depodaki guncelleme.json hala eski surumu gosteriyor." Yellow
+        Yaz "Telefon yeni surumu goremez." Yellow
+        exit 1
+    }
 }
 
 $boyut = "{0:N1} MB" -f ((Get-Item $hedef).Length / 1MB)
