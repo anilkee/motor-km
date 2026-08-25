@@ -105,6 +105,12 @@ class TrackingService : Service(), LocationListener {
         /** Ya da bu kadar yol alindiginda (metre). */
         private const val POINT_DISTANCE_M = 40f
 
+        /** Duruşa gecerken eklenecek artik parcanin alt siniri (gurultu elensin). */
+        private const val MIN_ARTIK_M = 3f
+
+        /** Ve ust siniri: bundan buyugu olcum hatasidir, eklenmez. */
+        private const val MAX_ARTIK_M = 50f
+
         /** Durgunken nokta yazma araligi - zikzak olusmasin diye seyrek. */
         private const val DURGUN_NOKTA_ARALIGI_MS = 120_000L
 
@@ -570,6 +576,17 @@ class TrackingService : Service(), LocationListener {
                 if (hareketBasi > 0L) {
                     hareketSuresiMs += System.currentTimeMillis() - hareketBasi
                     hareketBasi = 0L
+                }
+                // Son kabul edilen konumdan durma noktasina kadar olan parca
+                // esigin altinda kaldigi icin hic eklenmemisti; duruşa gecerken
+                // atilirsa her durakta birkac metre kayboluyor. Gunde 15 durak
+                // ~0,3 km ediyor. Ust sinir var, yoksa surukleme buradan sizar.
+                lastLocation?.let { son ->
+                    val artik = son.distanceTo(location)
+                    if (artik in MIN_ARTIK_M..MAX_ARTIK_M) {
+                        totalDistanceM += artik
+                        TrackerState.distanceM.value = totalDistanceM
+                    }
                 }
                 hareketHalinde = false
                 demir = location
