@@ -46,12 +46,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.seferdefteri.app.BuildConfig
+import com.seferdefteri.app.PilKorumasi
 import com.seferdefteri.app.Prefs
 import com.seferdefteri.app.update.CheckResult
 import com.seferdefteri.app.update.UpdateInfo
 import com.seferdefteri.app.update.Updater
 import com.seferdefteri.app.sync.YedekSonuc
 import com.seferdefteri.app.data.hepsiniSil
+import com.seferdefteri.app.hava.Hava
 import com.seferdefteri.app.sync.Hesap
 import com.seferdefteri.app.sync.HesapSonuc
 import com.seferdefteri.app.sync.Yedekleyici
@@ -94,6 +96,7 @@ fun SettingsScreen(
     var kayitSilMesaj by remember { mutableStateOf<String?>(null) }
     var geriYukleOnayi by remember { mutableStateOf(false) }
     var geriYukleniyor by remember { mutableStateOf(false) }
+    var yagmur by remember { mutableStateOf(prefs.yagmurUyarisi) }
 
     fun kontrolEt() {
         scope.launch {
@@ -395,6 +398,38 @@ fun SettingsScreen(
             )
         }
 
+        // ------------------------------------------------------ yagmur
+        SectionCard("Yagmur uyarisi") {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Yagmur yaklasinca haber ver", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Vardiya acikken onumuzdeki ${Hava.PENCERE_SAAT} saate bakar; " +
+                            "yagis olasiligi %${Hava.OLASILIK_ESIGI} ustune cikarsa bildirim gonderir.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = yagmur,
+                    onCheckedChange = {
+                        yagmur = it
+                        prefs.yagmurUyarisi = it
+                    }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Hava bilgisi Open-Meteo'dan aliniyor. Sadece bulundugun konumun " +
+                    "yaklasik koordinati sorulur, kimlik bilgisi gonderilmez.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+
         // --------------------------------------------- telefondaki kayitlar
         SectionCard("Telefondaki kayitlar") {
             Text(
@@ -449,28 +484,59 @@ fun SettingsScreen(
 
         // ------------------------------------------------------ pil ayari
         SectionCard("Arka planda calisma") {
+            // Ayardan donuldugunde durum tazelensin diye ekran her gorunur
+            // oldugunda yeniden okunuyor.
+            var pilMuaf by remember { mutableStateOf(PilKorumasi.muafMi(ctx)) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    pilMuaf = PilKorumasi.muafMi(ctx)
+                    kotlinx.coroutines.delay(3000)
+                }
+            }
+
+            SatirDeger(
+                "Pil kisitlamasi",
+                if (pilMuaf) "Kapali - iyi" else "Acik - riskli",
+                vurgula = !pilMuaf
+            )
+            Spacer(Modifier.height(8.dp))
             Text(
-                "Vardiya sirasinda telefon ekrani kapaliyken de konum kaydedilir. " +
-                    "Bazi telefonlar pil tasarrufu icin uygulamayi durdurabilir; " +
-                    "asagidan bu uygulamayi 'kisitlama yok' yapman onerilir.",
+                if (pilMuaf) {
+                    "Vardiya sirasinda telefon ekrani kapaliyken de konum kaydedilir. " +
+                        "Bu telefonda uygulama pil optimizasyonundan muaf, ayar dogru."
+                } else {
+                    "Vardiya sirasinda telefon ekrani kapaliyken de konum kaydedilmesi " +
+                        "gerekiyor. Su an telefon bu uygulamayi pil tasarrufu icin " +
+                        "durdurabilir; gun ortasinda kilometre saymayi birakabilir."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            PilKorumasi.ureticiNotu()?.let { not ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    not,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
-                onClick = {
-                    runCatching {
-                        ctx.startActivity(
-                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
-                },
+                onClick = { PilKorumasi.muafiyetIste(ctx) },
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Icon(Icons.Filled.BatteryAlert, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("Pil ayarlarini ac")
+                Text(if (pilMuaf) "Pil ayarlarini ac" else "Kisitlamayi kaldir")
+            }
+            if (PilKorumasi.ureticiAyariVarMi()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { PilKorumasi.ureticiAyariniAc(ctx) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("Otomatik baslatma ayari")
+                }
             }
         }
 
@@ -481,7 +547,9 @@ fun SettingsScreen(
             SatirDeger("Harita", "OpenStreetMap")
             Spacer(Modifier.height(6.dp))
             Text(
-                "Tum veriler sadece bu telefonda tutulur, hicbir yere gonderilmez.",
+                "Kayitlar telefonunda tutulur. Disari giden tek sey, senin actigin " +
+                    "sunucu yedegi ve -acikken- yagmur uyarisi icin sorulan konum. " +
+                    "Reklam veya takip amaciyla hicbir veri paylasilmaz.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )

@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 internal class Db(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 4) {
+    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 5) {
 
     override fun onCreate(db: SQLiteDatabase) {
         surum2Tablolari(db)
@@ -19,6 +19,7 @@ internal class Db(context: Context) :
                 "distance_m REAL NOT NULL DEFAULT 0," +
                 "auto_stop INTEGER," +
                 "kazanc REAL," +
+                "hareket_ms INTEGER NOT NULL DEFAULT 0," +
                 "note TEXT)"
         )
         db.execSQL(
@@ -47,6 +48,7 @@ internal class Db(context: Context) :
         // Veri asla silinmez; sadece eksik tablolar eklenir.
         if (oldVersion < 2) surum2Tablolari(db)
         if (oldVersion < 4) surum3Alanlari(db)   // eski kurulumlarda kazanc sutunu yok
+        if (oldVersion < 5) surum5Alanlari(db)
     }
 
     /** Gunluk kazanc alani (sema surumu 3). */
@@ -54,6 +56,19 @@ internal class Db(context: Context) :
         // Yeni kurulumlarda sutun CREATE TABLE ile geliyor; burasi sadece
         // yukseltme yolu. Zaten varsa ALTER hata verir, yutuyoruz.
         runCatching { db.execSQL("ALTER TABLE shifts ADD COLUMN kazanc REAL") }
+    }
+
+    /**
+     * Hareket halinde gecen sure (sema surumu 5).
+     *
+     * Ortalama hiz once toplam vardiya suresine bolunuyordu; paket beklerken
+     * sure isliyor ama km artmadigi icin ortalama surekli dusuyordu. Artik
+     * sadece hareket halindeki sure sayiliyor.
+     */
+    private fun surum5Alanlari(db: SQLiteDatabase) {
+        runCatching {
+            db.execSQL("ALTER TABLE shifts ADD COLUMN hareket_ms INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     /** Paket ve bakim tablolari (sema surumu 2 ile geldi). */
@@ -117,16 +132,20 @@ class Repo(context: Context) {
         return db.insert("shifts", null, v)
     }
 
-    fun endShift(id: Long, distanceM: Double) {
+    fun endShift(id: Long, distanceM: Double, hareketMs: Long = 0L) {
         val v = ContentValues().apply {
             put("end_time", System.currentTimeMillis())
             put("distance_m", distanceM)
+            put("hareket_ms", hareketMs)
         }
         db.update("shifts", v, "id=?", arrayOf(id.toString()))
     }
 
-    fun updateDistance(id: Long, distanceM: Double) {
-        val v = ContentValues().apply { put("distance_m", distanceM) }
+    fun updateDistance(id: Long, distanceM: Double, hareketMs: Long = 0L) {
+        val v = ContentValues().apply {
+            put("distance_m", distanceM)
+            put("hareket_ms", hareketMs)
+        }
         db.update("shifts", v, "id=?", arrayOf(id.toString()))
     }
 
@@ -324,6 +343,7 @@ class Repo(context: Context) {
             costTry = fuels.sumOf { it.priceTry },
             shiftCount = shifts.size,
             activeMs = shifts.sumOf { it.durationMs },
+            hareketMs = shifts.sumOf { it.hareketMs },
             kazanc = shifts.sumOf { it.kazanc ?: 0.0 },
             kazancliVardiya = shifts.count { it.kazanc != null }
         )
@@ -434,6 +454,8 @@ class Repo(context: Context) {
                 y.name("mesafeM").value(c.getDouble(c.getColumnIndexOrThrow("distance_m")))
                 val kz = c.getColumnIndex("kazanc")
                 if (kz >= 0 && !c.isNull(kz)) y.name("kazanc").value(c.getDouble(kz))
+                val hs = c.getColumnIndex("hareket_ms")
+                if (hs >= 0 && !c.isNull(hs)) y.name("hareketMs").value(c.getLong(hs))
                 y.endObject()
             }
         }
@@ -504,7 +526,8 @@ class Repo(context: Context) {
         distanceM = getDouble(getColumnIndexOrThrow("distance_m")),
         autoStopAt = getColumnIndexOrThrow("auto_stop").let { if (isNull(it)) null else getLong(it) },
         note = getColumnIndexOrThrow("note").let { if (isNull(it)) null else getString(it) },
-        kazanc = getColumnIndex("kazanc").let { if (it < 0 || isNull(it)) null else getDouble(it) }
+        kazanc = getColumnIndex("kazanc").let { if (it < 0 || isNull(it)) null else getDouble(it) },
+        hareketMs = getColumnIndex("hareket_ms").let { if (it < 0 || isNull(it)) 0L else getLong(it) }
     )
 
     private fun Cursor.toPoint() = TrackPoint(
@@ -570,12 +593,14 @@ fun Repo.iceAktar(veri: org.json.JSONObject): Int {
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
                 db.execSQL(
-                    "INSERT INTO shifts (id, start_time, end_time, distance_m, kazanc) VALUES (?,?,?,?,?)",
+                    "INSERT INTO shifts (id, start_time, end_time, distance_m, kazanc, hareket_ms) " +
+                        "VALUES (?,?,?,?,?,?)",
                     arrayOf<Any?>(
                         o.getLong("id"), o.getLong("baslangic"),
                         if (o.isNull("bitis")) null else o.getLong("bitis"),
                         o.optDouble("mesafeM", 0.0),
-                        if (o.has("kazanc") && !o.isNull("kazanc")) o.getDouble("kazanc") else null
+                        if (o.has("kazanc") && !o.isNull("kazanc")) o.getDouble("kazanc") else null,
+                        o.optLong("hareketMs", 0L)
                     )
                 )
                 satir++

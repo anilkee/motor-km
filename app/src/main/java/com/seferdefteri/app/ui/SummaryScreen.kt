@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.seferdefteri.app.data.Repo
@@ -158,37 +159,28 @@ fun SummaryScreen(
         if (ozet.kazanc > 0.0) {
             item {
                 SectionCard("Kazanc") {
-                    val yakitGider = if (tuketim.gecerli) ozet.km * tuketim.tryPerKm else ozet.costTry
-                    val net = ozet.kazanc - yakitGider
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatBox("Kazanc", lira(ozet.kazanc), modifier = Modifier.weight(1f))
-                        StatBox(
-                            "Yakit gideri", lira(yakitGider),
-                            renk = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatBox(
-                            "Net", lira(net),
-                            renk = if (net >= 0) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    Text(
+                        lira(ozet.kazanc),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(Modifier.height(12.dp))
                     HorizontalDivider()
                     Spacer(Modifier.height(4.dp))
-                    if (ozet.saatlikKazanc > 0.0) {
-                        SatirDeger("Saatlik kazanc", lira(ozet.saatlikKazanc))
-                    }
                     if (paketSayisi > 0) {
                         SatirDeger("Paket basina", lira(ozet.kazanc / paketSayisi))
                     }
                     if (ozet.km > 0) {
                         SatirDeger("Km basina", lira(ozet.kazanc / ozet.km))
                     }
+                    // Cok kisa vardiyalarda bolum anlamsiz buyuk cikiyor;
+                    // satir yine de duruyor ki nerede oldugu bilinsin.
+                    SatirDeger(
+                        "Saat basina",
+                        if (ozet.saatlikKazanc > 0.0) lira(ozet.saatlikKazanc) else "-"
+                    )
                     if (ozet.kazancliVardiya < ozet.shiftCount) {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -288,7 +280,12 @@ fun SummaryScreen(
                     )
                 }
                 SatirDeger("Gidilen yol", kmDeger(ozet.km) + " km")
-                SatirDeger("Direksiyon basinda", sure(ozet.activeMs))
+                SatirDeger("Vardiyada gecen", sure(ozet.activeMs))
+                // Ortalama hiz hareket suresine bolunuyor; ikisini yan yana
+                // gostermezsek "3 km / 23 dk neden 139 km/s" sorusu cikiyor.
+                if (ozet.hareketMs > 0L) {
+                    SatirDeger("Hareket halinde", sure(ozet.hareketMs))
+                }
                 SatirDeger("Ortalama hiz", sayi(ozet.avgKmh, 0) + " km/s")
             }
         }

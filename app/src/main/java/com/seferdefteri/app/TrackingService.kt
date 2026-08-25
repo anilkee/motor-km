@@ -20,10 +20,18 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.seferdefteri.app.data.Repo
+import com.seferdefteri.app.hava.Hava
+import com.seferdefteri.app.hava.YagisSaati
 import com.seferdefteri.app.widget.KuryeWidget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Vardiya suresince on planda calisip konum toplayan servis.
@@ -42,6 +50,11 @@ class TrackingService : Service(), LocationListener {
 
         private const val CHANNEL_ID = "vardiya"
         private const val NOTIF_ID = 1001
+
+        /** Yagmur uyarisi icin ayri kanal: vardiya bildirimi sessiz, bu degil. */
+        private const val HAVA_KANALI = "hava"
+        private const val HAVA_NOTIF_ID = 1002
+        private const val HAVA_ARALIGI_MS = 20 * 60_000L
 
         // ------------------------------------------------------------------
         //  Mesafe filtreleri
@@ -149,13 +162,28 @@ class TrackingService : Service(), LocationListener {
     /** Durgunken en son ne zaman nokta yazdik. */
     private var durgunNoktaZamani = 0L
 
+    /** Kapanmis hareket araliklarinin toplami (ms). */
+    private var hareketSuresiMs = 0L
+    /** Su anki hareket araliginin baslangici; durgunsak 0. */
+    private var hareketBasi = 0L
+
+    /** Hareketle gecen sure: kapanmislar + varsa su an suren aralik. */
+    private fun hareketSuresi(): Long =
+        hareketSuresiMs + if (hareketBasi > 0L) System.currentTimeMillis() - hareketBasi else 0L
+
+    /** Yagmur tahmini icin: suspend cagriyi yurutecek kapsam. */
+    private val kapsam = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var sonHavaKontrolu = 0L
+
     /** 20 saniyede bir: mesafeyi diske yaz, bildirimi tazele, otomatik bitisi kontrol et. */
     private val ticker = object : Runnable {
         override fun run() {
             if (shiftId > 0) {
-                repo.updateDistance(shiftId, totalDistanceM)
+                repo.updateDistance(shiftId, totalDistanceM, hareketSuresi())
+                TrackerState.hareketSuresiMs.value = hareketSuresi()
                 updateNotification()
                 KuryeWidget.tazele(this@TrackingService)
+                havayiKontrolEtGerekirse()
                 val stopAt = autoStopAt
                 if (stopAt != null && System.currentTimeMillis() >= stopAt) {
                     finishShift()
@@ -210,6 +238,7 @@ class TrackingService : Service(), LocationListener {
     /** Hareket/durgunluk durumunu bastan baslat. */
     private fun hareketDurumuSifirla() {
         hareketHalinde = false
+        hareketBasi = 0L
         demir = null
         yavaslamaBasi = 0L
         durgunNoktaZamani = 0L
@@ -242,6 +271,7 @@ class TrackingService : Service(), LocationListener {
 
         shiftId = repo.startShift(autoStop)
         totalDistanceM = 0.0
+        hareketSuresiMs = 0L
         hareketDurumuSifirla()
         lastPointSavedAt = 0L
         distanceAtLastPoint = 0.0
@@ -263,6 +293,8 @@ class TrackingService : Service(), LocationListener {
     private fun resumeShift(id: Long, distance: Double, autoStop: Long?, startedAt: Long) {
         shiftId = id
         totalDistanceM = distance
+        // Servis yeniden dogduysa onceki hareket suresi kaybolmasin.
+        hareketSuresiMs = repo.shift(id)?.hareketMs ?: 0L
         autoStopAt = autoStop
         hareketDurumuSifirla()
         distanceAtLastPoint = distance
@@ -273,6 +305,7 @@ class TrackingService : Service(), LocationListener {
         TrackerState.startedAt.value = startedAt
         TrackerState.autoStopAt.value = autoStop
         TrackerState.distanceM.value = distance
+        TrackerState.hareketSuresiMs.value = hareketSuresiMs
         TrackerState.path.value = saved
         TrackerState.pointCount.value = saved.size
 
@@ -294,14 +327,14 @@ class TrackingService : Service(), LocationListener {
         if (shiftId > 0) {
             // Son konumu da rotaya yaz.
             lastLocation?.let { savePoint(it) }
-            repo.endShift(shiftId, totalDistanceM)
+            repo.endShift(shiftId, totalDistanceM, hareketSuresi())
         } else {
             // Servis yeniden yaratilmis olabilir: uygulama bellekten atildiktan
             // sonra widget'tan/bildirimden "bitir" denirse shiftId bos gelir.
             // Bu durumda DB'deki acik vardiyayi bulup kapat; yoksa vardiya
             // sonsuza kadar acik kalir.
             repo.activeShift()?.let { acik ->
-                repo.endShift(acik.id, acik.distanceM)
+                repo.endShift(acik.id, acik.distanceM, acik.hareketMs)
             }
         }
         // Daha once yarim kalmis baska vardiya varsa onlari da kapat.
@@ -421,6 +454,10 @@ class TrackingService : Service(), LocationListener {
     override fun onLocationChanged(location: Location) {
         if (shiftId <= 0) return
 
+        // Dogruluk elenmeden once isaretleniyor: buradaki soru "konum akiyor mu",
+        // "olcum guvenilir mi" degil. Ekran bununla servisin oldugunu anliyor.
+        TrackerState.sonKonumZamani.value = System.currentTimeMillis()
+
         // Dogrulugu kotu olan konumlari tamamen at: 25 m hatali bir olcum
         // 25 mlik sahte hareket uretebilir.
         if (location.hasAccuracy() && location.accuracy > MAX_ACCURACY_M) return
@@ -464,6 +501,8 @@ class TrackingService : Service(), LocationListener {
             (uzaklik >= DEMIR_YARICAP_M && ortHiz >= DEMIR_HIZ_MS)
 
         if (gercektenHareket) {
+            // Durgundan harekete gecis: sureyi saymaya basla.
+            if (!hareketHalinde) hareketBasi = System.currentTimeMillis()
             hareketHalinde = true
             yavaslamaBasi = 0L
             // Mesafeyi demirden itibaren say: bekleme suresince biriken
@@ -527,6 +566,11 @@ class TrackingService : Service(), LocationListener {
             if (yavaslamaBasi == 0L) {
                 yavaslamaBasi = location.time
             } else if (location.time - yavaslamaBasi > DURMA_SURESI_MS) {
+                // Harekten durgunluga gecis: suren araligi kapat.
+                if (hareketBasi > 0L) {
+                    hareketSuresiMs += System.currentTimeMillis() - hareketBasi
+                    hareketBasi = 0L
+                }
                 hareketHalinde = false
                 demir = location
                 lastLocation = null
@@ -587,6 +631,15 @@ class TrackingService : Service(), LocationListener {
                 setShowBadge(false)
             }
             (getSystemService(NotificationManager::class.java)).createNotificationChannel(channel)
+
+            val havaKanali = NotificationChannel(
+                HAVA_KANALI,
+                "Yagmur uyarisi",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Vardiya sirasinda yagmur yaklasinca haber verir"
+            }
+            (getSystemService(NotificationManager::class.java)).createNotificationChannel(havaKanali)
         }
     }
 
@@ -672,12 +725,70 @@ class TrackingService : Service(), LocationListener {
         wakeLock = null
     }
 
+    // ------------------------------------------------------------ hava
+
+    /**
+     * Vardiya sirasinda yagmur yaklasiyor mu diye bakar.
+     *
+     * Ticker 20 saniyede bir calisiyor ama hava tahmini o siklikta
+     * degismiyor; 20 dakikada bir sorgu hem yeterli hem de hem pili
+     * hem karsi tarafi yormuyor.
+     */
+    private fun havayiKontrolEtGerekirse() {
+        val simdi = System.currentTimeMillis()
+        if (simdi - sonHavaKontrolu < HAVA_ARALIGI_MS) return
+        val konum = lastLocation ?: return
+        val prefs = Prefs(this)
+        if (!prefs.yagmurUyarisi) return
+
+        sonHavaKontrolu = simdi
+        kapsam.launch {
+            val tahmin = Hava.yagisTahmini(konum.latitude, konum.longitude)
+            val saat = Hava.uyarilacakSaat(tahmin) ?: return@launch
+            // Ayni yagis saati icin bir kez uyar; yoksa 20 dakikada bir tekrarlar.
+            if (prefs.bildirilenYagisSaati == saat.zaman) return@launch
+            prefs.bildirilenYagisSaati = saat.zaman
+            yagmurBildir(saat)
+        }
+    }
+
+    private fun yagmurBildir(saat: YagisSaati) {
+        val kalanDk = ((saat.zaman - System.currentTimeMillis()) / 60_000L).toInt()
+        // Tahmin saatlik kovalar halinde geliyor; icinde bulundugumuz kova
+        // gecmiste baslamis olabilir, o zaman yagmur "su an" demektir.
+        val neZaman = when {
+            kalanDk <= 0 -> "Su saatte"
+            kalanDk <= 15 -> "Birazdan"
+            kalanDk < 60 -> "$kalanDk dakika icinde"
+            else -> "Yaklasik ${kalanDk / 60} saat icinde"
+        }
+        val bildirim = NotificationCompat.Builder(this, HAVA_KANALI)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(if (kalanDk <= 0) "Yagmur var" else "Yagmur geliyor")
+            .setContentText("$neZaman yagmur bekleniyor (%${saat.olasilik}). Yagmurluguna bak.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 0,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            )
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(this).notify(HAVA_NOTIF_ID, bildirim)
+        }
+    }
+
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        kapsam.cancel()
         stopListening()
         releaseWakeLock()
         // Vardiya hala aciksa mesafeyi kaybetme.
-        if (shiftId > 0) repo.updateDistance(shiftId, totalDistanceM)
+        if (shiftId > 0) repo.updateDistance(shiftId, totalDistanceM, hareketSuresi())
         super.onDestroy()
     }
 

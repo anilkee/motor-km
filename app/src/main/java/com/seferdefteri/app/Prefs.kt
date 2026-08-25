@@ -72,6 +72,16 @@ class Prefs(context: Context) {
         get() = sp.getFloat("last_liter_price", 0f)
         set(v) = sp.edit().putFloat("last_liter_price", v).apply()
 
+    /** Vardiya sirasinda yagmur yaklasinca bildirim gonderilsin mi. */
+    var yagmurUyarisi: Boolean
+        get() = sp.getBoolean("yagmur_uyarisi", true)
+        set(v) = sp.edit().putBoolean("yagmur_uyarisi", v).apply()
+
+    /** Uyarisi gonderilmis olan yagis saati; ayni saat icin tekrar uyarmamak icin. */
+    var bildirilenYagisSaati: Long
+        get() = sp.getLong("bildirilen_yagis", 0L)
+        set(v) = sp.edit().putLong("bildirilen_yagis", v).apply()
+
     /**
      * 1.10 oncesi surumlerde GPS suruklemesi kilometreyi sisiriyordu.
      * O kayitlar yanlis oldugu icin yukseltmede bir kez siliniyor.

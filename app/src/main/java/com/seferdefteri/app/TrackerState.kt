@@ -24,6 +24,12 @@ object TrackerState {
     /** GPS'ten en az bir gecerli konum alindi mi. */
     val hasFix = MutableStateFlow(false)
 
+    /** Hareket halinde gecen sure (ms); ortalama hiz bununla hesaplanir. */
+    val hareketSuresiMs = MutableStateFlow(0L)
+
+    /** Son konum guncellemesinin zamani; servis oldu mu anlamak icin. */
+    val sonKonumZamani = MutableStateFlow(0L)
+
     /** Son konumun dogrulugu (metre). */
     val accuracyM = MutableStateFlow(0f)
 
@@ -48,6 +54,8 @@ object TrackerState {
         speedKmh.value = 0.0
         hasFix.value = false
         accuracyM.value = 0f
+        sonKonumZamani.value = 0L
+        hareketSuresiMs.value = 0L
         path.value = emptyList()
         pointCount.value = 0
         deliveries.value = emptyList()

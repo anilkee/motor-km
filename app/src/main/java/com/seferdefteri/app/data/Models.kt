@@ -9,15 +9,24 @@ data class Shift(
     val autoStopAt: Long?,       // otomatik bitis zamani (epoch ms), yoksa null
     val note: String?,
     /** Vardiya bitince girilen gunluk kazanc (TL). */
-    val kazanc: Double? = null
+    val kazanc: Double? = null,
+    /** Bu vardiyada hareket halinde gecen sure (ms). */
+    val hareketMs: Long = 0L
 ) {
     val km: Double get() = distanceM / 1000.0
     val isActive: Boolean get() = endTime == null
     val durationMs: Long get() = (endTime ?: System.currentTimeMillis()) - startTime
-    /** Ortalama hiz (km/s). */
+
+    /**
+     * Ortalama hiz (km/s).
+     *
+     * Paket beklerken gecen sure sayilmaz; yoksa yol kenarinda beklendikce
+     * ortalama surekli dusuyor ve gercek surus hizini gostermiyordu.
+     * hareketMs bilinmiyorsa (eski kayit) toplam sureye duselim.
+     */
     val avgKmh: Double
         get() {
-            val h = durationMs / 3_600_000.0
+            val h = (if (hareketMs > 0L) hareketMs else durationMs) / 3_600_000.0
             return if (h > 0.0) km / h else 0.0
         }
 }
@@ -109,20 +118,22 @@ data class Summary(
     val costTry: Double,
     val shiftCount: Int,
     val activeMs: Long,
+    /** Hareket halinde gecen toplam sure (ms). */
+    val hareketMs: Long = 0L,
     /** Girilen gunluk kazanclarin toplami. */
     val kazanc: Double = 0.0,
     /** Kazanc girilmis vardiya sayisi. */
     val kazancliVardiya: Int = 0
 ) {
     /**
-     * Saatlik kazanc. Cok kisa surelerde bolum sacma buyuk cikiyor
-     * (1 dakikalik vardiyada 100 bin TL gibi); 15 dakikanin altinda
-     * hesaplamiyoruz, ekran da 0 olunca satiri gostermiyor.
+     * Saat basina kazanc. Cok kisa surelerde bolum sacma buyuk cikiyor
+     * (1 dakikalik vardiyada 100 bin TL gibi), o yuzden 5 dakikanin
+     * altinda hesaplanmiyor; ekran o zaman "-" gosteriyor.
      */
     val saatlikKazanc: Double
         get() {
             val h = activeMs / 3_600_000.0
-            return if (h >= 0.25) kazanc / h else 0.0
+            return if (h >= 5.0 / 60.0) kazanc / h else 0.0
         }
 
     /** 100 km'de kac litre. */
@@ -131,9 +142,10 @@ data class Summary(
     val kmPerLiter: Double get() = if (liters > 0.0) km / liters else 0.0
     /** 1 km kac TL'ye mal oluyor. */
     val tryPerKm: Double get() = if (km > 0.0) costTry / km else 0.0
+    /** Ortalama hiz: beklemede gecen sure sayilmaz. */
     val avgKmh: Double
         get() {
-            val h = activeMs / 3_600_000.0
+            val h = (if (hareketMs > 0L) hareketMs else activeMs) / 3_600_000.0
             return if (h > 0.0) km / h else 0.0
         }
 }

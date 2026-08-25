@@ -50,6 +50,8 @@ function ozetCikar(veri, bas, son) {
     litre: yakit.reduce((t, y) => t + (y.litre || 0), 0),
     tutar: yakit.reduce((t, y) => t + (y.tutar || 0), 0),
     sureMs: vardiyalar.reduce((t, v) => t + ((v.bitis || Date.now()) - v.baslangic), 0),
+    // Ortalama hiz icin: beklemede gecen sure sayilmaz.
+    hareketMs: vardiyalar.reduce((t, v) => t + (v.hareketMs || 0), 0),
     paketSayisi: paketler.length,
     kazanc: vardiyalar.reduce((t, v) => t + (v.kazanc || 0), 0),
     kazancliVardiya: vardiyalar.filter(v => v.kazanc != null).length
@@ -112,20 +114,18 @@ function ozet(veri, q, kullanici) {
 
   let kazancKart = "";
   if (o.kazanc > 0) {
-    const yakitGider = t ? o.km * t.tlKm : o.tutar;
-    const net = o.kazanc - yakitGider;
-    // 15 dakikanin altinda bolum sacma buyuk cikiyor; uygulamayla ayni esik.
-    const saatlik = o.sureMs >= 900000 ? o.kazanc / (o.sureMs / 3600000) : 0;
+    // Yakit gideri kazanctan DUSULMUYOR. Yakit sekmesi tuketimi gostermek
+    // icin var, gelir-gider hesabi icin degil.
+    // 5 dakikanin altinda bolum sacma buyuk cikiyor; uygulamayla ayni esik.
+    const saatlik = o.sureMs >= 300000 ? o.kazanc / (o.sureMs / 3600000) : 0;
     kazancKart = `<div class="kart"><h2>Kazanc</h2>
       <div class="izgara">
         ${olcu("Kazanc", lira(o.kazanc))}
-        ${olcu("Yakit gideri", lira(yakitGider))}
-        ${olcu("Net", lira(net))}
-        ${saatlik > 0 ? olcu("Saatlik", lira(saatlik)) : ""}
       </div>
       <div class="satirlar" style="margin-top:14px">
         ${o.paketSayisi ? `<div><span>Paket basina</span><span>${lira(o.kazanc / o.paketSayisi)}</span></div>` : ""}
         ${o.km > 0 ? `<div><span>Km basina</span><span>${lira(o.kazanc / o.km)}</span></div>` : ""}
+        <div><span>Saat basina</span><span>${saatlik > 0 ? lira(saatlik) : "-"}</span></div>
       </div>
       ${o.kazancliVardiya < o.vardiyalar.length
         ? `<div class="notlar">${o.vardiyalar.length} vardiyanin ${o.kazancliVardiya} tanesine kazanc girilmis.</div>`
@@ -158,7 +158,8 @@ ${donemCubugu(secim)}
 <div class="kart"><div class="izgara">
   ${olcu('Kilometre', sayi(o.km, 1), o.vardiyalar.length + ' vardiya')}
   ${olcu('Paket', String(o.paketSayisi), o.km > 0 && o.paketSayisi ? sayi(o.km / o.paketSayisi, 1) + ' km/paket' : '')}
-  ${olcu('Direksiyonda', sure(o.sureMs))}
+  ${olcu('Vardiyada', sure(o.sureMs))}
+  ${o.hareketMs > 0 ? olcu('Hareket halinde', sure(o.hareketMs)) : ''}
   ${olcu('Yakıt harcaması', o.litre > 0 ? lira(o.tutar) : '-', o.litre > 0 ? sayi(o.litre, 2) + ' L' : '')}
 </div></div>
 ${kazancKart}
@@ -180,13 +181,14 @@ function vardiyaListesi(veri, q, kullanici) {
 
   const satir = o.vardiyalar.slice().sort((a, b) => b.baslangic - a.baslangic).map(v => {
     const ms = (v.bitis || Date.now()) - v.baslangic;
+    const hms = v.hareketMs || ms;
     const km = (v.mesafeM || 0) / 1000;
     return `<tr>
       <td><a class="satir" href="/vardiya/${encodeURIComponent(v.id)}">${gun(v.baslangic)}</a><br>
       <span style="color:var(--soluk);font-size:12px">${saat(v.baslangic)} - ${v.bitis ? saat(v.bitis) : 'devam'}</span></td>
       <td class="sag">${sayi(km, 1)} km</td><td class="sag">${paketSay[v.id] || 0}</td>
       <td class="sag">${sure(ms)}</td>
-      <td class="sag">${sayi(ms > 0 ? km / (ms / 3600000) : 0, 0)} km/s</td></tr>`;
+      <td class="sag">${sayi(hms > 0 ? km / (hms / 3600000) : 0, 0)} km/s</td></tr>`;
   }).join('');
 
   return sayfa('Vardiyalar', `${donemCubugu(secim)}
@@ -212,7 +214,7 @@ function vardiyaDetay(veri, id, kullanici) {
     ${olcu('Mesafe', sayi(km, 1), 'km')}
     ${olcu('Paket', String(paketler.length))}
     ${olcu('Süre', sure(ms))}
-    ${olcu('Ortalama', sayi(ms > 0 ? km / (ms / 3600000) : 0, 0), 'km/s')}
+    ${olcu('Ortalama', sayi((v.hareketMs || ms) > 0 ? km / ((v.hareketMs || ms) / 3600000) : 0, 0), 'km/s')}
   </div>
 </div>
 <div class="kart"><h2>Rota</h2><div id="harita" class="harita"></div>

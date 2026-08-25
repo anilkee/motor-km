@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -48,11 +49,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.seferdefteri.app.PilKorumasi
 import com.seferdefteri.app.Prefs
 import com.seferdefteri.app.TrackerState
 import kotlinx.coroutines.delay
@@ -77,13 +80,18 @@ fun HomeScreen(
     val rota by TrackerState.path.collectAsState()
     val paketSayisi by TrackerState.deliveryCount.collectAsState()
     val paketYerleri by TrackerState.deliveries.collectAsState()
+    val sonKonum by TrackerState.sonKonumZamani.collectAsState()
+    val hareketSuresi by TrackerState.hareketSuresiMs.collectAsState()
 
-    // Kronometre: saniyede bir tazelensin.
+    var pilUyarisiGizli by remember { mutableStateOf(false) }
+
+    // Kronometre. Vardiya kapaliyken de yavas yavas doniyor: pil uyarisi
+    // kullanici ayardan donunce kendiliginden kaybolsun diye.
     var simdi by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(calisiyor) {
-        while (calisiyor) {
+        while (true) {
             simdi = System.currentTimeMillis()
-            delay(1000)
+            delay(if (calisiyor) 1000 else 5000)
         }
     }
 
@@ -97,7 +105,9 @@ fun HomeScreen(
 
     val gecenSure = if (calisiyor && basladi > 0) simdi - basladi else 0L
     val km = mesafeM / 1000.0
-    val ortHiz = if (gecenSure > 0) km / (gecenSure / 3_600_000.0) else 0.0
+    // Ortalama, beklemede gecen sureyi saymaz: paket beklerken sure isliyor
+    // ama km artmadigi icin ortalama surekli dusuyordu.
+    val ortHiz = if (hareketSuresi > 0) km / (hareketSuresi / 3_600_000.0) else 0.0
 
     Column(modifier = modifier.fillMaxSize()) {
 
@@ -169,6 +179,15 @@ fun HomeScreen(
                 }
             }
         }
+
+        // ----------------------------------------------- pil / servis uyarisi
+        PilUyarisi(
+            calisiyor = calisiyor,
+            sonKonum = sonKonum,
+            simdi = simdi,
+            gizle = pilUyarisiGizli,
+            onGizle = { pilUyarisiGizli = true }
+        )
 
         // -------------------------------------------------------- harita
         Box(
@@ -426,4 +445,95 @@ private fun SaatSeciciDialog(
             TextButton(onClick = onIptal) { Text("Iptal") }
         }
     )
+}
+
+/** Konum akisi bu kadar susarsa telefon servisi oldurmus sayilir. */
+private const val SESSIZLIK_ESIGI_MS = 6 * 60_000L
+
+/**
+ * Telefonun uygulamayi arka planda kapatmasina karsi uyari.
+ *
+ * Iki ayri durum var:
+ *  - Vardiya acik ama konum uzun suredir gelmiyor: is isten gecmis, hemen soyle.
+ *  - Vardiya kapali ve uygulama pil optimizasyonuna tabi: onceden uyar.
+ */
+@Composable
+private fun PilUyarisi(
+    calisiyor: Boolean,
+    sonKonum: Long,
+    simdi: Long,
+    gizle: Boolean,
+    onGizle: () -> Unit
+) {
+    if (gizle) return
+    val ctx = LocalContext.current
+
+    val susmus = calisiyor && sonKonum > 0L && simdi - sonKonum > SESSIZLIK_ESIGI_MS
+    // Muafiyet durumu ekran her tazelendiginde yeniden okunuyor; kullanici
+    // ayardan donunce kartin kendiliginden kaybolmasi icin gerekli.
+    val kisitli = remember(simdi / 5_000L, calisiyor) { !PilKorumasi.muafMi(ctx) }
+    if (!susmus && !kisitli) return
+
+    val dakika = if (sonKonum > 0L) (simdi - sonKonum) / 60_000L else 0L
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (susmus) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.BatteryAlert,
+                    contentDescription = null,
+                    tint = if (susmus) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    if (susmus) "Konum $dakika dakikadir gelmiyor"
+                    else "Telefonun vardiyayi kesebilir",
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (susmus) MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (susmus) {
+                    "Telefon uygulamayi arka planda kisitlamis olabilir. Kilometre " +
+                        "sayilmiyor. Asagidaki dugmeden izni ac, sonra vardiyayi " +
+                        "kapatip yeniden baslat."
+                } else {
+                    "Bu uygulama pil optimizasyonuna tabi. Vardiya sirasinda telefon " +
+                        "onu kapatirsa kilometre saymayi birakir. Bir kerelik izin yeter."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (susmus) MaterialTheme.colorScheme.onErrorContainer
+                else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            PilKorumasi.ureticiNotu()?.let { not ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    not,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (susmus) MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { PilKorumasi.muafiyetIste(ctx) }) { Text("Izin ver") }
+                if (PilKorumasi.ureticiAyariVarMi()) {
+                    OutlinedButton(onClick = { PilKorumasi.ureticiAyariniAc(ctx) }) {
+                        Text("Otomatik baslatma")
+                    }
+                }
+                TextButton(onClick = onGizle) { Text("Kapat") }
+            }
+        }
+    }
 }

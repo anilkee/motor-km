@@ -62,10 +62,12 @@ android {
         create("dogrudan") {
             dimension = "dagitim"
             buildConfigField("boolean", "KENDI_GUNCELLER", "true")
+            buildConfigField("boolean", "PIL_IZNI_SORULABILIR", "true")
         }
         create("play") {
             dimension = "dagitim"
             buildConfigField("boolean", "KENDI_GUNCELLER", "false")
+            buildConfigField("boolean", "PIL_IZNI_SORULABILIR", "false")
         }
     }
 

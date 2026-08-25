@@ -1,6 +1,6 @@
 {
-    "versionCode":  12,
-    "versionName":  "1.11",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.11/sefer-defteri-1.11.apk",
-    "notes":  "Gunluk kazanc takibi geldi. Vardiyayi bitirince gunluk kazancini soruyor; girdigin tutar Ozet ve Gecmis ekranlarinda gunluk, haftalik, aylik ve tum zamanlar olarak toplaniyor. Yakit gideri dusulup net kazanc, km basina ve paket basina kazanc da cikiyor. Ayni ozet web panelinde de var.\n\nBu surumde telefondaki eski kayitlar bir kez siliniyor, cunku onlarin kilometresi GPS suruklemesi yuzunden sisikti. Bakim hatirlaticilarin duruyor."
+    "versionCode":  13,
+    "versionName":  "1.12",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.12/sefer-defteri-1.12.apk",
+    "notes":  "Ortalama hiz duzeldi. Onceden mesafeyi toplam vardiya suresine boluyordu; paket beklerken sure isliyor ama km artmadigi icin ortalama surekli dusuyordu. Artik sadece hareket halinde gecen sure sayiliyor. Ozet ekraninda \"Vardiyada gecen\" ve \"Hareket halinde\" ayri ayri gorunuyor.\n\nKazanctan yakit gideri dusulmuyor artik. Yakit sekmesi tuketimi gostermek icin; kazanc kartinda kazancin, km basina ve saat basina karsiligi var.\n\nPil korumasi geldi. Telefonlar arka plandaki uygulamalari kapatabiliyor ve o zaman gun ortasinda kilometre saymayi birakiyor. Uygulama artik bunu fark edip tek dokunusla izin almani sagliyor; Xiaomi, Oppo, Vivo, Huawei, Samsung icin ayrica ne yapman gerektigini yaziyor. Vardiya sirasinda konum akisi kesilirse de uyariyor.\n\nYagmur uyarisi geldi. Vardiya acikken onumuzdeki 4 saate bakiyor, yagmur yaklasiyorsa bildirim gonderiyor. Ayarlardan kapatabilirsin.\n\nAyrica: guncelleme kutusu artik indirmeyi kendisi yapiyor, Ayarlar\u0027a gitmene gerek yok."
 }
