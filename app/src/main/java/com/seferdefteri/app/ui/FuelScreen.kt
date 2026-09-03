@@ -96,16 +96,18 @@ fun FuelScreen(
             runCatching { d.delete() }
             when {
                 s.hata != null -> fisHata = s.hata
+                s.fisDegil ->
+                    fisHata = s.not.ifBlank { "Bu bir akaryakit fisi degil." }
                 s.litre == null && s.tutar == null ->
-                    fisHata = "Fis okunamadi, degerleri elle gir."
+                    fisHata = s.not.ifBlank { "Fis okunamadi, degerleri elle gir." }
                 else -> {
                     s.tutar?.let { liraMetin = sayi(it, 2) }
                     s.litre?.let { litreMetin = sayi(it, 2) }
                     hata = null
-                    // Modelin dogru okudugunu garanti edemiyoruz; fis olmayan
-                    // bir fotografta bile makul sayilar uretebiliyor. O yuzden
-                    // her durumda kullaniciya karsilastirtiyoruz.
+                    // Okuma iyi de olsa son sozu kullanici soyluyor: yanlis
+                    // yakit rakami tuketim hesabini aylarca bozar.
                     fisNot = "Fisle karsilastir, dogruysa kaydet."
+                    if (!s.guvenli && s.not.isNotBlank()) fisHata = s.not
                 }
             }
         }

@@ -20,6 +20,10 @@ data class FisSonuc(
     val litre: Double?,
     val tutar: Double?,
     val guvenli: Boolean,
+    /** Fotograf akaryakit fisi degilse true. */
+    val fisDegil: Boolean = false,
+    /** Sunucunun tek cumlelik durum aciklamasi ("Tutar silik, okunamadi." gibi). */
+    val not: String = "",
     val hata: String? = null
 )
 
@@ -44,12 +48,11 @@ object FisOkuyucu {
             val adres = prefs.sunucuAdresi.trim().trimEnd('/')
             val anahtar = prefs.cihazAnahtari.trim()
             if (adres.isEmpty() || anahtar.isEmpty()) {
-                return@withContext FisSonuc(null, null, false,
-                    "Once Ayarlar'dan sunucuya giris yap.")
+                return@withContext FisSonuc(null, null, false, hata = "Once Ayarlar'dan sunucuya giris yap.")
             }
 
             val jpeg = kucult(dosya)
-                ?: return@withContext FisSonuc(null, null, false, "Fotograf okunamadi.")
+                ?: return@withContext FisSonuc(null, null, false, hata = "Fotograf okunamadi.")
 
             var conn: HttpURLConnection? = null
             try {
@@ -72,19 +75,21 @@ object FisOkuyucu {
                 val metin = (if (kod in 200..299) conn.inputStream else conn.errorStream)
                     ?.bufferedReader()?.use { it.readText() } ?: ""
                 val o = runCatching { JSONObject(metin) }.getOrNull()
-                    ?: return@withContext FisSonuc(null, null, false, "Sunucu cevabi anlasilmadi.")
+                    ?: return@withContext FisSonuc(null, null, false, hata = "Sunucu cevabi anlasilmadi.")
 
                 if (kod !in 200..299) {
                     return@withContext FisSonuc(null, null, false,
-                        o.optString("hata", "Sunucu hatasi ($kod)"))
+                        hata = o.optString("hata", "Sunucu hatasi ($kod)"))
                 }
                 FisSonuc(
                     litre = if (o.isNull("litre")) null else o.optDouble("litre"),
                     tutar = if (o.isNull("tutar")) null else o.optDouble("tutar"),
-                    guvenli = o.optBoolean("guvenli", false)
+                    guvenli = o.optBoolean("guvenli", false),
+                    fisDegil = o.optBoolean("fisDegil", false),
+                    not = o.optString("not", "")
                 )
             } catch (e: Exception) {
-                FisSonuc(null, null, false, "Baglanti kurulamadi: ${e.message}")
+                FisSonuc(null, null, false, hata = "Baglanti kurulamadi: ${e.message}")
             } finally {
                 conn?.disconnect()
             }

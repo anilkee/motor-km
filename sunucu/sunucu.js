@@ -34,8 +34,8 @@ const ARSIV_TUT = 60;
 const ayarlar = JSON.parse(fs.readFileSync(AYAR_DOSYA, 'utf8').replace(/^﻿/, ''));
 const googleVar = Boolean(ayarlar.googleIstemciId && ayarlar.googleIstemciSir);
 
-// NVIDIA anahtari SADECE burada durur; APK'ya asla girmez.
-Z.ayarla(ayarlar.nvidiaAnahtari || '');
+// Claude anahtari SADECE burada durur; APK'ya asla girmez.
+Z.ayarla(ayarlar.claudeAnahtari || '');
 const zekaVar = Z.acikMi();
 
 // --------------------------------------------------------------- oturum
@@ -457,7 +457,12 @@ const sunucu = http.createServer(async (istek, cevap) => {
 
         try {
           const r = await Z.fisOku(b64);
-          return json(200, { durum: 'tamam', litre: r.litre, tutar: r.tutar, urun: r.urun, guvenli: r.guvenli, fisDegil: Boolean(r.fisDegil) });
+          return json(200, {
+            durum: 'tamam',
+            litre: r.litre, tutar: r.tutar, urun: r.urun,
+            guvenli: r.guvenli, fisDegil: Boolean(r.fisDegil),
+            not: r.not || ''
+          });
         } catch (e) {
           return json(502, { hata: String(e.message).slice(0, 200) });
         }
