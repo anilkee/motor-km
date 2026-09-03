@@ -21,6 +21,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.seferdefteri.app.sync.FisOkuyucu
+import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +73,43 @@ fun FuelScreen(
     var litreMetin by remember { mutableStateOf("") }
     var hata by remember { mutableStateOf<String?>(null) }
     var silinecek by remember { mutableStateOf<FuelEntry?>(null) }
+
+    // ---- fis fotografindan okuma ----
+    val ctx = LocalContext.current
+    val kapsam = rememberCoroutineScope()
+    var fisOkunuyor by remember { mutableStateOf(false) }
+    var fisHata by remember { mutableStateOf<String?>(null) }
+    var fisNot by remember { mutableStateOf<String?>(null) }
+    var fisDosya by remember { mutableStateOf<java.io.File?>(null) }
+
+    val kamera = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { basarili ->
+        val d = fisDosya
+        if (!basarili || d == null || !d.exists()) return@rememberLauncherForActivityResult
+        fisOkunuyor = true
+        fisHata = null
+        fisNot = null
+        kapsam.launch {
+            val s = FisOkuyucu.oku(ctx, prefs, d)
+            fisOkunuyor = false
+            runCatching { d.delete() }
+            when {
+                s.hata != null -> fisHata = s.hata
+                s.litre == null && s.tutar == null ->
+                    fisHata = "Fis okunamadi, degerleri elle gir."
+                else -> {
+                    s.tutar?.let { liraMetin = sayi(it, 2) }
+                    s.litre?.let { litreMetin = sayi(it, 2) }
+                    hata = null
+                    // Modelin dogru okudugunu garanti edemiyoruz; fis olmayan
+                    // bir fotografta bile makul sayilar uretebiliyor. O yuzden
+                    // her durumda kullaniciya karsilastirtiyoruz.
+                    fisNot = "Fisle karsilastir, dogruysa kaydet."
+                }
+            }
+        }
+    }
 
     val tlDeger = parseSayi(liraMetin)
     val litreDeger = parseSayi(litreMetin)
@@ -127,6 +173,43 @@ fun FuelScreen(
         // ------------------------------------------------- yeni kayit
         item {
             SectionCard("Yakit ekle") {
+                // Fisi cekince litre ve tutar dolu gelir; yine de onaylatiyoruz,
+                // yanlis okumus olabilir.
+                OutlinedButton(
+                    onClick = {
+                        fisHata = null
+                        val d = FisOkuyucu.geciciDosya(ctx)
+                        fisDosya = d
+                        runCatching { kamera.launch(FisOkuyucu.paylasimUri(ctx, d)) }
+                            .onFailure { fisHata = "Kamera acilamadi." }
+                    },
+                    enabled = !fisOkunuyor,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    if (fisOkunuyor) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp), strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.size(10.dp))
+                        Text("Fis okunuyor...")
+                    } else {
+                        Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Fisi cek, kendi doldursun")
+                    }
+                }
+                fisHata?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error)
+                }
+                fisNot?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(Modifier.height(12.dp))
+
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)

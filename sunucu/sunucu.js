@@ -21,6 +21,7 @@ const S = require('./sayfalar');
 const R = require('./raporlar');
 const { TANITIM } = require('./tanitim');
 const { uygulamayaDon } = require('./donus');
+const Z = require('./zeka');
 const { kacis, sayfa, tarih, sayi } = S;
 
 const KOK = __dirname;
@@ -32,6 +33,10 @@ const ARSIV_TUT = 60;
 // JSON.parse BOM'u kabul etmiyor, o yuzden basindan temizliyoruz.
 const ayarlar = JSON.parse(fs.readFileSync(AYAR_DOSYA, 'utf8').replace(/^﻿/, ''));
 const googleVar = Boolean(ayarlar.googleIstemciId && ayarlar.googleIstemciSir);
+
+// NVIDIA anahtari SADECE burada durur; APK'ya asla girmez.
+Z.ayarla(ayarlar.nvidiaAnahtari || '');
+const zekaVar = Z.acikMi();
 
 // --------------------------------------------------------------- oturum
 
@@ -298,6 +303,22 @@ yine de <b>durduğunda</b> kullan.</p>
 
 // --------------------------------------------------------------- sunucu
 
+/** Rapor sayfalarindaki donem secimiyle ayni mantik. */
+function donemSecBasit(q) {
+  const simdi = new Date();
+  const gunBasi = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate()).getTime();
+  const secim = q.get('donem') || 'ay';
+  let bas;
+  if (secim === 'bugun') bas = gunBasi;
+  else if (secim === 'hafta') bas = gunBasi - ((simdi.getDay() + 6) % 7) * 86400000;
+  else if (secim === 'tum') bas = 0;
+  else bas = new Date(simdi.getFullYear(), simdi.getMonth(), 1).getTime();
+  return { secim, bas, son: Number.MAX_SAFE_INTEGER };
+}
+
+/** Yorum onbellegi: ayni veri icin modele tekrar gitmeyelim. */
+const yorumOnbellek = new Map();
+
 function govdeOku(istek, sinir = 60 * 1024 * 1024) {
   return new Promise((coz, red) => {
     const p = []; let n = 0;
@@ -412,6 +433,34 @@ const sunucu = http.createServer(async (istek, cevap) => {
         const sayim = veriYaz(u.id, ham.toString('utf8'));
         K.cihazKullanildi(u.id, anahtar);
         return json(200, { durum: 'tamam', sayim });
+      }
+
+      // --------------------------------------------------- fis okuma
+      // Telefon fisin fotografini buraya gonderir; anahtar burada oldugu
+      // icin cagriyi biz yapiyoruz. Sonuc kullaniciya ONAYLATILIR, dogrudan
+      // kaydedilmez - model rakami yanlis okursa kullanici duzeltebilsin.
+      if (yol === '/api/fis' && istek.method === 'POST') {
+        const yetki = istek.headers.authorization || '';
+        const anahtar = yetki.startsWith('Bearer ') ? yetki.slice(7) : '';
+        const u = K.cihazAnahtariIleBul(anahtar);
+        if (!u) return json(401, { hata: 'Cihaz anahtari gecersiz' });
+        if (u.engelli) return json(403, { hata: 'Hesap kapatilmis' });
+        if (!zekaVar) return json(503, { hata: 'Fis okuma sunucuda kapali' });
+
+        const ham = await govdeOku(istek, 8 * 1024 * 1024);
+        let b64;
+        try {
+          const o = JSON.parse(ham.toString('utf8'));
+          b64 = String(o.gorsel || '').replace(/^data:[^,]+,/, '');
+        } catch (e) { return json(400, { hata: 'Gecersiz istek' }); }
+        if (!b64 || b64.length < 100) return json(400, { hata: 'Gorsel yok' });
+
+        try {
+          const r = await Z.fisOku(b64);
+          return json(200, { durum: 'tamam', litre: r.litre, tutar: r.tutar, urun: r.urun, guvenli: r.guvenli, fisDegil: Boolean(r.fisDegil) });
+        } catch (e) {
+          return json(502, { hata: String(e.message).slice(0, 200) });
+        }
       }
 
       return json(404, { hata: 'yok' });
@@ -579,6 +628,44 @@ const sunucu = http.createServer(async (istek, cevap) => {
     if (yol === '/vardiyalar') return html(R.vardiyaListesi(veri, url.searchParams, kullanici));
     if (yol === '/harita') return html(R.harita(veri, url.searchParams, kullanici));
     if (yol === '/yakit') return html(R.yakit(veri, url.searchParams, kullanici));
+    // ------------------------------------------------ yapay zeka yorumu
+    // Sayfa acilirken beklemesin diye ayri adres: sayfa yuklenince
+    // arka planda cekiliyor. Sonuc onbellekte tutuluyor, her acilista
+    // modele gitmiyoruz.
+    if (yol === '/yorum') {
+      if (!zekaVar) return json(503, { hata: 'Yorum ozelligi kapali' });
+      const { bas, son, secim } = donemSecBasit(url.searchParams);
+      const ozet = R.zekaOzeti(veri, bas, son);
+      const parmak = crypto.createHash('sha1').update(JSON.stringify(ozet)).digest('hex');
+      const anahtar = kullanici.id + '|' + secim + '|' + parmak;
+      const onbellek = yorumOnbellek.get(anahtar);
+      if (onbellek) return json(200, { metin: onbellek, onbellek: true });
+      if (!ozet.toplam.vardiyaSayisi) return json(200, { metin: 'Bu donemde vardiya yok.' });
+      try {
+        const metin = await Z.yorumla('Su donemin ozeti (' + secim + '):', ozet);
+        yorumOnbellek.set(anahtar, metin);
+        if (yorumOnbellek.size > 200) yorumOnbellek.delete(yorumOnbellek.keys().next().value);
+        return json(200, { metin });
+      } catch (e) {
+        return json(502, { hata: String(e.message).slice(0, 300) });
+      }
+    }
+
+    // ------------------------------------------------ duz Turkce soru
+    if (yol === '/soru' && istek.method === 'POST') {
+      if (!zekaVar) return json(503, { hata: 'Bu ozellik kapali' });
+      const g = await formOku(istek);
+      const soru = (g.get('soru') || '').trim().slice(0, 300);
+      if (!soru) return json(400, { hata: 'Soru bos' });
+      const { bas, son } = donemSecBasit(url.searchParams);
+      try {
+        const cevap = await Z.soruCevapla(soru, R.zekaOzeti(veri, bas, son));
+        return json(200, { cevap });
+      } catch (e) {
+        return json(502, { hata: String(e.message).slice(0, 300) });
+      }
+    }
+
     if (yol === '/disaktar.csv') {
       return gonder(200, 'text/csv; charset=utf-8', R.csv(veri),
         { 'Content-Disposition': 'attachment; filename="kurye.csv"' });

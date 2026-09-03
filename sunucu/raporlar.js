@@ -163,6 +163,41 @@ ${donemCubugu(secim)}
   ${olcu('Yakıt harcaması', o.litre > 0 ? lira(o.tutar) : '-', o.litre > 0 ? sayi(o.litre, 2) + ' L' : '')}
 </div></div>
 ${kazancKart}
+<div class="kart" id="zekaKart" style="display:none">
+  <h2>Yorum</h2>
+  <div id="zekaMetin" style="line-height:1.6"></div>
+  <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+    <input id="soruKutu" placeholder="Verine soru sor: en kârlı günüm hangisi?"
+      style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid var(--cizgi);background:var(--kart);color:inherit;font:inherit">
+    <button id="soruDugme" style="padding:10px 18px;border-radius:10px;border:0;background:var(--vurgu);color:#fff;font:inherit;cursor:pointer">Sor</button>
+  </div>
+  <div id="soruCevap" style="margin-top:12px;line-height:1.6"></div>
+  <div class="notlar">Rakamlar sunucuda hesaplanır; yapay zeka yalnızca anlatır.</div>
+</div>
+<script>
+(function(){
+  var d=new URLSearchParams(location.search).get("donem")||"ay";
+  var kart=document.getElementById("zekaKart");
+  var metin=document.getElementById("zekaMetin");
+  metin.textContent="Yorum hazırlanıyor...";
+  kart.style.display="";
+  fetch("/yorum?donem="+encodeURIComponent(d)).then(function(r){return r.json()}).then(function(j){
+    if(j.metin){metin.textContent=j.metin;}
+    else{kart.style.display="none";}
+  }).catch(function(){kart.style.display="none"});
+  function sor(){
+    var q=document.getElementById("soruKutu").value.trim();
+    if(!q)return;
+    var c=document.getElementById("soruCevap");
+    c.textContent="Bakıyorum...";
+    fetch("/soru?donem="+encodeURIComponent(d),{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"soru="+encodeURIComponent(q)})
+      .then(function(r){return r.json()}).then(function(j){c.textContent=j.cevap||j.hata||"Cevap alınamadı."})
+      .catch(function(){c.textContent="Cevap alınamadı."});
+  }
+  document.getElementById("soruDugme").onclick=sor;
+  document.getElementById("soruKutu").addEventListener("keydown",function(e){if(e.key==="Enter")sor()});
+})();
+</script>
 ${tuketimKart}
 <div class="kart"><h2>Gün gün</h2>
   ${gunSatir ? `<table><tr><th>Gün</th><th class="sag">Mesafe</th><th class="sag">Paket</th>
@@ -299,3 +334,83 @@ function csv(veri) {
 }
 
 module.exports = { ozet, vardiyaListesi, vardiyaDetay, harita, yakit, csv, veriYok, ozetCikar, olcu };
+
+/* ===========================================================================
+ *  Yapay zekaya verilecek ozet.
+ *
+ *  Butun sayilar BURADA hesaplanir; model sadece anlatir. Modelin kendi
+ *  aritmetigine guvenmiyoruz - kucuk modellerde yanlis toplama yaptigini
+ *  gorduk, buyuklerde de garanti yok.
+ * =========================================================================== */
+function zekaOzeti(veri, bas, son) {
+  const o = ozetCikar(veri, bas, son);
+  const t = tuketimHesapla(veri, bas, son);
+
+  // Gun gun kirilim
+  const gunluk = {};
+  for (const v of o.vardiyalar) {
+    const g = new Date(v.baslangic);
+    const k = new Date(g.getFullYear(), g.getMonth(), g.getDate()).getTime();
+    if (!gunluk[k]) gunluk[k] = { km: 0, dk: 0, hareketDk: 0, paket: 0, kazanc: 0, kazancVar: false };
+    gunluk[k].km += (v.mesafeM || 0) / 1000;
+    gunluk[k].dk += ((v.bitis || Date.now()) - v.baslangic) / 60000;
+    gunluk[k].hareketDk += (v.hareketMs || 0) / 60000;
+    if (v.kazanc != null) { gunluk[k].kazanc += v.kazanc; gunluk[k].kazancVar = true; }
+  }
+  for (const p of o.paketler) {
+    const g = new Date(p.zaman);
+    const k = new Date(g.getFullYear(), g.getMonth(), g.getDate()).getTime();
+    if (gunluk[k]) gunluk[k].paket++;
+  }
+
+  const GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+  const gunler = Object.keys(gunluk).sort((a, b) => a - b).map(k => {
+    const d = gunluk[k], t2 = new Date(Number(k));
+    return {
+      tarih: t2.toLocaleDateString('tr-TR'),
+      gun: GUNLER[t2.getDay()],
+      km: +d.km.toFixed(1),
+      calismaDk: Math.round(d.dk),
+      hareketDk: Math.round(d.hareketDk),
+      paket: d.paket,
+      kazancTL: d.kazancVar ? +d.kazanc.toFixed(2) : null
+    };
+  });
+
+  // Saat saat paket dagilimi
+  const saatler = {};
+  for (const p of o.paketler) {
+    const s = new Date(p.zaman).getHours();
+    saatler[s] = (saatler[s] || 0) + 1;
+  }
+  const saatDagilimi = Object.keys(saatler).sort((a, b) => a - b)
+    .map(s => ({ saat: Number(s) + ':00', paket: saatler[s] }));
+
+  const hareketMs = o.hareketMs || 0;
+  return {
+    toplam: {
+      km: +o.km.toFixed(1),
+      vardiyaSayisi: o.vardiyalar.length,
+      calismaSaati: +(o.sureMs / 3600000).toFixed(1),
+      hareketSaati: +(hareketMs / 3600000).toFixed(1),
+      paket: o.paketSayisi,
+      kazancTL: o.kazanc > 0 ? +o.kazanc.toFixed(2) : null,
+      kazancGirilmisVardiya: o.kazancliVardiya,
+      ortalamaHizKmS: hareketMs > 0 ? +(o.km / (hareketMs / 3600000)).toFixed(1) : null,
+      kmBasinaKazancTL: (o.kazanc > 0 && o.km > 0) ? +(o.kazanc / o.km).toFixed(2) : null,
+      paketBasinaKazancTL: (o.kazanc > 0 && o.paketSayisi) ? +(o.kazanc / o.paketSayisi).toFixed(2) : null,
+      saatBasinaKazancTL: (o.kazanc > 0 && hareketMs >= 300000) ? +(o.kazanc / (o.sureMs / 3600000)).toFixed(2) : null
+    },
+    yakit: t ? {
+      yuzKmdeLitre: +t.litre100.toFixed(2),
+      litreBasinaKm: +t.kmLitre.toFixed(2),
+      kmBasinaTL: +t.tlKm.toFixed(2),
+      olculenKm: +t.km.toFixed(1),
+      dolumSayisi: t.adet
+    } : null,
+    gunler,
+    saatDagilimi
+  };
+}
+
+module.exports.zekaOzeti = zekaOzeti;
