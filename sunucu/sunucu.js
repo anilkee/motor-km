@@ -34,8 +34,9 @@ const ARSIV_TUT = 60;
 const ayarlar = JSON.parse(fs.readFileSync(AYAR_DOSYA, 'utf8').replace(/^﻿/, ''));
 const googleVar = Boolean(ayarlar.googleIstemciId && ayarlar.googleIstemciSir);
 
-// Claude anahtari SADECE burada durur; APK'ya asla girmez.
-Z.ayarla(ayarlar.claudeAnahtari || '');
+// Yapay zeka anahtari SADECE burada durur; APK'ya asla girmez.
+// Hangi saglayici secildigi ayarlar.json'a gore belirleniyor (bkz. zeka.js).
+Z.ayarla(ayarlar);
 const zekaVar = Z.acikMi();
 
 // --------------------------------------------------------------- oturum
