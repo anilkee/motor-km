@@ -17,6 +17,7 @@
 'use strict';
 
 const https = require('https');
+const FIS = require('./fis-ayristir');
 
 const SUNUCU = 'api.anthropic.com';
 const YOL = '/v1/messages';
@@ -164,14 +165,17 @@ const FIS_SEMASI = {
   type: 'object',
   properties: {
     akaryakitFisiMi: { type: 'boolean' },
-    litre: { anyOf: [{ type: 'number' }, { type: 'null' }] },
-    tutar: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    // Sayi degil, fisteki SATIRIN KENDISI. Cevirimi kodda yapiyoruz:
+    // model kopyalamada iyi, ondalik ayraci cevirmede degil.
+    ltSatiri: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    toplamSatiri: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     urun: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     not: { type: 'string' }
   },
-  required: ['akaryakitFisiMi', 'litre', 'tutar', 'urun', 'not'],
+  required: ['akaryakitFisiMi', 'ltSatiri', 'toplamSatiri', 'urun', 'not'],
   additionalProperties: false
 };
+
 
 /**
  * Akaryakit fisi fotografindan litre ve tutari okur.
@@ -193,39 +197,34 @@ async function fisOku(base64Jpeg) {
         {
           type: 'text',
           text:
-            'Bu bir akaryakit fisi fotografi olmali. Once buna karar ver.\n' +
-            'Fis ise: alinan yakit miktarini litre olarak ve odenen TOPLAM ' +
-            'tutari TL olarak oku. Birim fiyati (TL/LT) tutar sanma.\n' +
-            'Goremedigin bir sayiyi tahmin etme, null birak.\n' +
-            '"not" alanina Turkce tek cumlelik durum yaz (ornek: "Fis net ' +
-            'okundu." / "Tutar silik, okunamadi." / "Bu bir akaryakit fisi degil.")'
+            FIS.ISTEM + '\n\n' +
+            'Ayrica fotograf akaryakit fisi degilse akaryakitFisiMi=false yap. ' +
+            'ltSatiri ve toplamSatiri alanlarina fisteki satirlari OLDUGU GIBI ' +
+            'yaz (ornek: "12,900 LT X 7,750"). Okuyamadigin alani null birak. ' +
+            '"not" alanina Turkce tek cumlelik durum yaz.'
         }
       ]
     }]
   });
 
-  const ham = metinAl(cevap);
   let o;
   try {
-    o = JSON.parse(ham);
+    o = JSON.parse(metinAl(cevap));
   } catch (e) {
     throw new Error('Fis cevabi cozulemedi');
   }
 
-  const sayi = (d) => (typeof d === 'number' && Number.isFinite(d) ? d : null);
-  const litre = sayi(o.litre);
-  const tutar = sayi(o.tutar);
+  // Ayristirma NVIDIA yoluyla ayni kodda - iki saglayici ayni sonucu versin.
+  const r = FIS.ayristir(
+    'LTSATIR=' + (o.ltSatiri || '') + '\nTOPLAM=' + (o.toplamSatiri || ''));
 
   return {
-    litre,
-    tutar,
+    litre: r.litre,
+    tutar: r.tutar,
     urun: typeof o.urun === 'string' ? o.urun.slice(0, 40) : null,
     not: typeof o.not === 'string' ? o.not.slice(0, 120) : '',
     fisDegil: o.akaryakitFisiMi === false,
-    // Akla yatkinlik: motosiklet deposu 100 litreyi gecmez.
-    guvenli: o.akaryakitFisiMi === true &&
-      litre != null && litre > 0 && litre < 100 &&
-      tutar != null && tutar > 0 && tutar < 100000,
+    guvenli: o.akaryakitFisiMi === true && r.guvenli,
     jeton: cevap.usage || null
   };
 }

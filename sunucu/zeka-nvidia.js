@@ -13,6 +13,7 @@
 'use strict';
 
 const https = require('https');
+const FIS = require('./fis-ayristir');
 
 const ADRES = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
@@ -197,24 +198,14 @@ async function soruCevapla(soru, ozetler) {
  * icinden sayilari cekip kendimiz normallestiriyoruz. Sonuc kullaniciya
  * onaylatiliyor, dogrudan kaydedilmiyor.
  */
-async function fisOku(base64Png) {
+async function fisOku(base64Jpeg) {
   const govdeUret = (model) => ({
     model,
     messages: [{
       role: 'user',
       content: [
-        {
-          type: 'text',
-          // "Bu bir fis mi?" diye sormayi denedik: model bu isi beceremiyor.
-          // Gercek bir fisi "fis degil" diye reddetti, fis olmayan bir
-          // fotografta ise yine sayi uydurdu. Yargilama isini ona birakmak
-          // yerine sade okuma istiyoruz; dogrulamayi kullanici yapiyor.
-          text:
-            'Bu bir akaryakit fisi. Fisteki alinan yakit miktarini (litre) ve ' +
-            'odenen toplam tutari (TL) bul. Cevabi tam olarak su bicimde ver, ' +
-            'baska hicbir sey yazma:\nLITRE=<sayi>\nTUTAR=<sayi>\nURUN=<yakit cinsi>'
-        },
-        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64Png } }
+        { type: 'text', text: FIS.ISTEM },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64Jpeg } }
       ]
     }],
     temperature: 0,
@@ -222,95 +213,20 @@ async function fisOku(base64Png) {
   });
 
   const { cevap, model } = await sirayalDene(GORSEL_MODELLERI, govdeUret, 90_000);
-  return Object.assign(ayikla(cevap), { model, ham: cevap });
-}
-
-/**
- * "LITRE=8,03" gibi satirlardan sayilari cikarir.
- *
- * Fis yazisi Turkce bicimde (virgul ondalik) geliyor ama model bazen
- * noktaya cevirip veriyor, bazen binlik ayraci birakiyor. Kural:
- *  - iki ayrac varsa (1.234,56) sondaki ondalik, digeri binlik
- *  - tek ayrac varsa ve arkasinda tam 3 hane varsa (1.234) binliktir
- *  - diger her durumda ondalik (12.47 / 8,03)
- */
-function sayiyaCevir(ham) {
-  let s = ham.replace(/[.,]+$/, '');
-  const sonNokta = s.lastIndexOf('.');
-  const sonVirgul = s.lastIndexOf(',');
-  const sonAyrac = Math.max(sonNokta, sonVirgul);
-  if (sonAyrac >= 0) {
-    const ayracSayisi = (s.match(/[.,]/g) || []).length;
-    const hane = s.length - sonAyrac - 1;
-    if (ayracSayisi === 1 && hane === 3) {
-      s = s.replace(/[.,]/g, '');            // 1.234 -> 1234
-    } else {
-      s = s.slice(0, sonAyrac).replace(/[.,]/g, '') + '.' + s.slice(sonAyrac + 1);
-    }
-  }
-  const d = parseFloat(s);
-  return Number.isFinite(d) ? d : null;
-}
-
-/** Sayinin icinde bosluk olabiliyor ("384, 64"); temizleyip cevir. */
-const SAYI = '([0-9][0-9.,\\s]*[0-9]|[0-9])';
-
-function ilkEslesen(metin, kaliplar) {
-  for (const k of kaliplar) {
-    const m = k.exec(metin);
-    if (m) {
-      const d = sayiyaCevir(m[1].replace(/\s+/g, ''));
-      if (d != null) return d;
-    }
-  }
-  return null;
-}
-
-function ayikla(metin) {
-  // Model, fis olmayan bir fotografta bile makul gorunen sayilar uydurabiliyor
-  // (emulatorun sahte kamera goruntusunden "15 TL / 1,5 L" cikardi). Once
-  // "bu bir fis mi" sorusuna verdigi cevaba bakiyoruz.
-  if (/FIS\s*[=:]\s*(HAYIR|NO|HAYİR)/i.test(metin)) {
-    return { litre: null, tutar: null, urun: null, guvenli: false, fisDegil: true };
-  }
-
-  // Istenen bicim "LITRE=8,03" ama model cogu zaman uymuyor; duz metin
-  // icinde "Fuel Quantity: 8.03 LT" gibi yaziyor. Once etiketli bicimi,
-  // sonra serbest metin kaliplarini deniyoruz.
-  const litre = ilkEslesen(metin, [
-    new RegExp('LITRE\\s*[=:]\\s*' + SAYI, 'i'),
-    new RegExp('(?:MIKTAR|QUANTITY)[^0-9]{0,20}' + SAYI, 'i'),
-    new RegExp(SAYI + '\\s*(?:LT|LITRE|L\\b)', 'i')
-  ]);
-
-  // Tutarda dikkat: fiste birim fiyat da "TL" ile yaziliyor (44,85 TL/LT).
-  // Once "toplam/tutar" etiketlisini ariyoruz, o yoksa TL'li sayilarin
-  // en buyugunu aliyoruz - toplam her zaman birim fiyattan buyuktur.
-  let tutar = ilkEslesen(metin, [
-    new RegExp('TUTAR\\s*[=:]\\s*' + SAYI, 'i'),
-    new RegExp('(?:TOPLAM|TOTAL COST|TOTAL)[^0-9]{0,20}' + SAYI, 'i')
-  ]);
-  if (tutar == null) {
-    const hepsi = [];
-    const re = new RegExp(SAYI + '\\s*TL(?!\\s*/)', 'gi');
-    let m;
-    while ((m = re.exec(metin)) !== null) {
-      const d = sayiyaCevir(m[1].replace(/\s+/g, ''));
-      if (d != null) hepsi.push(d);
-    }
-    if (hepsi.length) tutar = Math.max.apply(null, hepsi);
-  }
-
-  const urunM = /URUN\s*[=:]\s*(.+)/i.exec(metin) ||
-    /\b(MOTORIN|MOTORİN|DIZEL|DİZEL|BENZIN|BENZİN|KURSUNSUZ\s*9?5?|KURŞUNSUZ\s*9?5?|LPG|EURO\s*DIESEL)\b/i.exec(metin);
+  const r = FIS.ayristir(cevap);
   return {
-    litre,
-    tutar,
-    urun: urunM ? urunM[1].trim().slice(0, 40) : null,
-    // Fis okunamadiysa cagiran taraf kullaniciya elle girdirsin.
-    guvenli: litre != null && tutar != null && litre > 0 && litre < 100 &&
-      tutar > 0 && tutar < 100000
+    litre: r.litre,
+    tutar: r.tutar,
+    urun: null,
+    not: r.guvenli ? '' : 'Fis okunamadi, degerleri elle gir.',
+    fisDegil: false,
+    guvenli: r.guvenli,
+    model,
+    ham: cevap
   };
 }
+
+
+// Fis ayristirma artik fis-ayristir.js icinde - iki saglayici da onu kullaniyor.
 
 module.exports = { ayarla, acikMi, yorumla, soruCevapla, fisOku, METIN_MODELLERI };
