@@ -1,6 +1,6 @@
 {
-    "versionCode":  13,
-    "versionName":  "1.12",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.12/sefer-defteri-1.12.apk",
-    "notes":  "Ortalama hiz duzeldi. Onceden mesafeyi toplam vardiya suresine boluyordu; paket beklerken sure isliyor ama km artmadigi icin ortalama surekli dusuyordu. Artik sadece hareket halinde gecen sure sayiliyor. Ozet ekraninda \"Vardiyada gecen\" ve \"Hareket halinde\" ayri ayri gorunuyor.\n\nKazanctan yakit gideri dusulmuyor artik. Yakit sekmesi tuketimi gostermek icin; kazanc kartinda kazancin, km basina ve saat basina karsiligi var.\n\nPil korumasi geldi. Telefonlar arka plandaki uygulamalari kapatabiliyor ve o zaman gun ortasinda kilometre saymayi birakiyor. Uygulama artik bunu fark edip tek dokunusla izin almani sagliyor; Xiaomi, Oppo, Vivo, Huawei, Samsung icin ayrica ne yapman gerektigini yaziyor. Vardiya sirasinda konum akisi kesilirse de uyariyor.\n\nYagmur uyarisi geldi. Vardiya acikken onumuzdeki 4 saate bakiyor, yagmur yaklasiyorsa bildirim gonderiyor. Ayarlardan kapatabilirsin.\n\nAyrica: guncelleme kutusu artik indirmeyi kendisi yapiyor, Ayarlar\u0027a gitmene gerek yok."
+    "versionCode":  14,
+    "versionName":  "1.13",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.13/sefer-defteri-1.13.apk",
+    "notes":  "Yakit fisini artik fotograftan okuyor. Yakit ekranindaki \"Fisi cek, kendi doldursun\" dugmesine bas, pompada fisin fotografini cek; litre ve tutar dolu geliyor. Fisle karsilastirip kaydediyorsun - son soz sende, cunku yanlis yakit rakami tuketim hesabini aylarca bozar.\n\nWeb panelinde iki yenilik: her donem icin Turkce yorum (kac km, kac paket, hangi saatte yogundun) ve verine duz Turkce soru sorabilecegin bir kutu. Ornek: \"en cok hangi saatte paket tasidim\". Butun rakamlar sunucuda hesaplaniyor, yapay zeka sadece anlatiyor.\n\nAyrica: durusa gecerken kaybolan son birkac metre artik sayiliyor. Gunde 15 durakta yaklasik 0,3 km ediyordu."
 }
