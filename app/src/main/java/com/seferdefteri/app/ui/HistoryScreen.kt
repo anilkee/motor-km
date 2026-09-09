@@ -150,7 +150,8 @@ private fun ShiftDetail(
     val noktalar = remember(shift.id) { repo.points(shift.id) }
     val rota = remember(shift.id) { noktalar.map { LatLon(it.lat, it.lon) } }
     val paketler = remember(shift.id) { repo.deliveries(shift.id) }
-    val paketYerleri = remember(shift.id) { paketler.map { LatLon(it.lat, it.lon) } }
+    // Konumu bilinmeyenler haritaya konmaz; paketler listesi sayim icin tam kalir.
+    val paketYerleri = remember(shift.id) { paketler.filter { it.konumVar }.map { LatLon(it.lat, it.lon) } }
     var silOnayi by remember { mutableStateOf(false) }
 
     // Scaffold ic ice kullanilmiyor: ust cubuk pay'i iki kez uygulanip

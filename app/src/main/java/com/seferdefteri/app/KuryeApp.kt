@@ -45,8 +45,12 @@ class KuryeApp : Application() {
             TrackerState.distanceM.value = s.distanceM
             TrackerState.path.value = repo.points(s.id).map { LatLon(it.lat, it.lon) }
             TrackerState.pointCount.value = TrackerState.path.value.size
-            TrackerState.deliveries.value = repo.deliveries(s.id).map { LatLon(it.lat, it.lon) }
-            TrackerState.deliveryCount.value = TrackerState.deliveries.value.size
+            // Konumu bilinmeyen paketler haritada gosterilmez ama SAYILIR:
+            // sayiyi filtrelenmis listeden almak konumsuz paketleri yok eder.
+            val paketler = repo.deliveries(s.id)
+            TrackerState.deliveries.value =
+                paketler.filter { it.konumVar }.map { LatLon(it.lat, it.lon) }
+            TrackerState.deliveryCount.value = paketler.size
         }
     }
 }

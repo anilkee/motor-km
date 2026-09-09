@@ -257,7 +257,10 @@ function vardiyaDetay(veri, id, kullanici) {
 <script>
 window.addEventListener('load',function(){
 var rota=${JSON.stringify(noktalar.map(n => [n.enlem, n.boylam]))};
-var pk=${JSON.stringify(paketler.map(p => [p.enlem, p.boylam, saat(p.zaman)]))};
+var pk=${JSON.stringify(
+      paketler.filter(p => p.konumVar !== false)
+        .map(p => [p.enlem, p.boylam, saat(p.zaman)])
+    )};
 var h=L.map('harita');
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(h);
 if(rota.length){var c=L.polyline(rota,{color:'#1565C0',weight:5}).addTo(h);
@@ -280,12 +283,19 @@ function harita(veri, q, kullanici) {
     if (!idler.has(k)) continue;
     (rotalar[k] = rotalar[k] || []).push([n.enlem, n.boylam]);
   }
-  const paketler = (veri.paketler || []).filter(p => p.zaman >= bas && p.zaman < son)
+  const donemPaketleri = (veri.paketler || []).filter(p => p.zaman >= bas && p.zaman < son);
+  // Konumu bilinmeyen paketler (kapali otopark, bodrum) haritaya KONMAZ -
+  // koordinatlari 0,0 oldugu icin Afrika aciklarinda gorunurlerdi.
+  // Sayida ise varlar; asagida ayrica belirtiliyor.
+  const paketler = donemPaketleri.filter(p => p.konumVar !== false)
     .map(p => [p.enlem, p.boylam]);
+  const konumsuz = donemPaketleri.length - paketler.length;
 
   return sayfa('Harita', `${donemCubugu(secim)}
 <div class="kart"><h2>Tüm rotalar</h2><div id="harita" class="harita" style="height:560px"></div>
-<div class="notlar">${vardiyalar.length} vardiya, ${paketler.length} paket.</div></div>
+<div class="notlar">${vardiyalar.length} vardiya, ${donemPaketleri.length} paket.${
+    konumsuz ? ` ${konumsuz} tanesinin konumu bilinmiyor, haritada yok.` : ''
+  }</div></div>
 <script>
 window.addEventListener('load',function(){
 var rl=${JSON.stringify(Object.values(rotalar))};

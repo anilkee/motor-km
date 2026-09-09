@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 internal class Db(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 5) {
+    SQLiteOpenHelper(context.applicationContext, "kurye.db", null, 6) {
 
     override fun onCreate(db: SQLiteDatabase) {
         surum2Tablolari(db)
@@ -49,6 +49,20 @@ internal class Db(context: Context) :
         if (oldVersion < 2) surum2Tablolari(db)
         if (oldVersion < 4) surum3Alanlari(db)   // eski kurulumlarda kazanc sutunu yok
         if (oldVersion < 5) surum5Alanlari(db)
+        if (oldVersion < 6) surum6Alanlari(db)
+    }
+
+    /**
+     * Konumsuz paket (sema surumu 6).
+     *
+     * Onceden konum alinamadiginda paket HIC sayilmiyordu: kapali otoparkta
+     * ya da bodrumda birakilan paket kayboluyordu. Artik her paket sayiliyor;
+     * konum yoksa bu alan 0 oluyor ve o paket haritada gosterilmiyor.
+     */
+    private fun surum6Alanlari(db: SQLiteDatabase) {
+        runCatching {
+            db.execSQL("ALTER TABLE deliveries ADD COLUMN konum_var INTEGER NOT NULL DEFAULT 1")
+        }
     }
 
     /** Gunluk kazanc alani (sema surumu 3). */
@@ -80,6 +94,7 @@ internal class Db(context: Context) :
                 "time INTEGER NOT NULL," +
                 "lat REAL NOT NULL," +
                 "lon REAL NOT NULL," +
+                "konum_var INTEGER NOT NULL DEFAULT 1," +
                 "note TEXT)"
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_deliveries_shift ON deliveries(shift_id, time)")
@@ -245,12 +260,23 @@ class Repo(context: Context) {
 
     // --------------------------------------------------------------- paket
 
-    fun addDelivery(shiftId: Long, lat: Double, lon: Double, note: String? = null): Long {
+    /**
+     * Paket kaydeder. [konumVar] false ise konum bilinmiyordur (kapali
+     * otopark, bodrum): paket yine SAYILIR ama haritada gosterilmez.
+     */
+    fun addDelivery(
+        shiftId: Long,
+        lat: Double,
+        lon: Double,
+        note: String? = null,
+        konumVar: Boolean = true
+    ): Long {
         val v = ContentValues().apply {
             put("shift_id", shiftId)
             put("time", System.currentTimeMillis())
             put("lat", lat)
             put("lon", lon)
+            put("konum_var", if (konumVar) 1 else 0)
             put("note", note)
         }
         return db.insert("deliveries", null, v)
@@ -476,13 +502,18 @@ class Repo(context: Context) {
         y.endArray()
 
         y.name("paketler").beginArray()
-        db.rawQuery("SELECT shift_id, time, lat, lon FROM deliveries ORDER BY time", null).use { c ->
+        db.rawQuery(
+            "SELECT shift_id, time, lat, lon, konum_var FROM deliveries ORDER BY time", null
+        ).use { c ->
             while (c.moveToNext()) {
                 y.beginObject()
                 y.name("vardiyaId").value(c.getLong(0))
                 y.name("zaman").value(c.getLong(1))
                 y.name("enlem").value(c.getDouble(2))
                 y.name("boylam").value(c.getDouble(3))
+                // Konumu bilinmeyen paket de yedege girer, yoksa geri
+                // yuklendiginde paket sayisi eksilir.
+                y.name("konumVar").value(c.getInt(4) != 0)
                 y.endObject()
             }
         }
@@ -546,6 +577,7 @@ class Repo(context: Context) {
         time = getLong(getColumnIndexOrThrow("time")),
         lat = getDouble(getColumnIndexOrThrow("lat")),
         lon = getDouble(getColumnIndexOrThrow("lon")),
+        konumVar = getColumnIndex("konum_var").let { if (it < 0 || isNull(it)) true else getInt(it) != 0 },
         note = getColumnIndexOrThrow("note").let { if (isNull(it)) null else getString(it) }
     )
 
@@ -623,10 +655,13 @@ fun Repo.iceAktar(veri: org.json.JSONObject): Int {
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
                 db.execSQL(
-                    "INSERT INTO deliveries (shift_id, time, lat, lon) VALUES (?,?,?,?)",
+                    "INSERT INTO deliveries (shift_id, time, lat, lon, konum_var) " +
+                        "VALUES (?,?,?,?,?)",
                     arrayOf<Any?>(
                         o.getLong("vardiyaId"), o.getLong("zaman"),
-                        o.getDouble("enlem"), o.getDouble("boylam")
+                        o.getDouble("enlem"), o.getDouble("boylam"),
+                        // Eski yedeklerde bu alan yok; onlarin hepsi konumluydu.
+                        if (o.optBoolean("konumVar", true)) 1 else 0
                     )
                 )
                 satir++

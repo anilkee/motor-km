@@ -51,6 +51,8 @@ data class Delivery(
     val time: Long,
     val lat: Double,
     val lon: Double,
+    /** Konum bilinmiyorsa false; paket sayilir ama haritada gosterilmez. */
+    val konumVar: Boolean = true,
     val note: String?
 )
 

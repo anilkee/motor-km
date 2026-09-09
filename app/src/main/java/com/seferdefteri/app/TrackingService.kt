@@ -315,8 +315,11 @@ class TrackingService : Service(), LocationListener {
         TrackerState.path.value = saved
         TrackerState.pointCount.value = saved.size
 
-        val paketler = repo.deliveries(id).map { LatLon(it.lat, it.lon) }
-        TrackerState.deliveries.value = paketler
+        // Konumsuz paketler haritada yok ama sayida VAR - sayiyi filtreden
+        // once alan listeden okuyoruz.
+        val paketler = repo.deliveries(id)
+        TrackerState.deliveries.value =
+            paketler.filter { it.konumVar }.map { LatLon(it.lat, it.lon) }
         TrackerState.deliveryCount.value = paketler.size
 
         goForeground()
@@ -367,18 +370,26 @@ class TrackingService : Service(), LocationListener {
             durdurEgerOnPlandaDegilse()
             return
         }
+        // Konum yoksa paket YINE SAYILIR. Onceden burada durup vazgeciyorduk;
+        // kapali otoparkta ya da bodrumda birakilan paket kayboluyordu ve
+        // kullanici gun sonunda eksik rakam goruyordu. Asil istenen sayidir,
+        // haritadaki yer ikincil.
         val konum = lastLocation ?: sonBilinenKonum()
-        if (konum == null) {
-            titret(Titresim.OLMADI)               // konum yok, kaydedilemedi
-            return
-        }
 
-        repo.addDelivery(shiftId, konum.latitude, konum.longitude)
-        TrackerState.deliveries.value =
-            TrackerState.deliveries.value + LatLon(konum.latitude, konum.longitude)
+        repo.addDelivery(
+            shiftId,
+            konum?.latitude ?: 0.0,
+            konum?.longitude ?: 0.0,
+            konumVar = konum != null
+        )
+        if (konum != null) {
+            TrackerState.deliveries.value =
+                TrackerState.deliveries.value + LatLon(konum.latitude, konum.longitude)
+        }
         TrackerState.deliveryCount.value = TrackerState.deliveryCount.value + 1
 
-        titret(longArrayOf(0, 55))                // tek kisa: "kaydedildi"
+        // Konum alinamadiysa farkli titresim: sayildi ama yeri isaretlenemedi.
+        titret(if (konum != null) longArrayOf(0, 55) else longArrayOf(0, 55, 90, 55))
         updateNotification()
         KuryeWidget.tazele(this)
     }
@@ -628,7 +639,27 @@ class TrackingService : Service(), LocationListener {
     override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
     }
 
+    /**
+     * Bir saglayici vardiya SIRASINDA acilirsa ona da abone ol.
+     *
+     * Saglayicilar sadece vardiya baslarken kontrol ediliyordu: o an kapali
+     * olan (ornegin ag konumu) bir daha hic dinlenmiyordu. Kullanici ayari
+     * sonradan acsa bile fark etmiyordu.
+     */
     override fun onProviderEnabled(provider: String) {
+        if (shiftId <= 0 || !hasLocationPermission()) return
+        // Ayni saglayici icin tekrar istek acmak oncekinin yerine geciyor,
+        // o yuzden cift abonelik olmuyor.
+        val aralik = when (provider) {
+            LocationManager.GPS_PROVIDER -> 2_000L
+            LocationManager.NETWORK_PROVIDER -> 10_000L
+            else -> return
+        }
+        runCatching {
+            locationManager.requestLocationUpdates(
+                provider, aralik, 0f, this, Looper.getMainLooper()
+            )
+        }
     }
 
     override fun onProviderDisabled(provider: String) {
