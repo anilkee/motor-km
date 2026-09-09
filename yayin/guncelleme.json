@@ -1,6 +1,6 @@
 {
-    "versionCode":  14,
-    "versionName":  "1.13",
-    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.13/sefer-defteri-1.13.apk",
-    "notes":  "Yakit fisini artik fotograftan okuyor. Yakit ekranindaki \"Fisi cek, kendi doldursun\" dugmesine bas, pompada fisin fotografini cek; litre ve tutar dolu geliyor. Fisle karsilastirip kaydediyorsun - son soz sende, cunku yanlis yakit rakami tuketim hesabini aylarca bozar.\n\nWeb panelinde iki yenilik: her donem icin Turkce yorum (kac km, kac paket, hangi saatte yogundun) ve verine duz Turkce soru sorabilecegin bir kutu. Ornek: \"en cok hangi saatte paket tasidim\". Butun rakamlar sunucuda hesaplaniyor, yapay zeka sadece anlatiyor.\n\nAyrica: durusa gecerken kaybolan son birkac metre artik sayiliyor. Gunde 15 durakta yaklasik 0,3 km ediyordu."
+    "versionCode":  15,
+    "versionName":  "1.14",
+    "apkUrl":  "https://github.com/anilkee/motor-km/releases/download/v1.14/sefer-defteri-1.14.apk",
+    "notes":  "Konum alinamayan yerde birakilan paket artik sayiliyor. Onceden kapali otoparkta, bodrumda ya da yuksek binalar arasinda pakete bastiginda sayac artmiyordu ve aksam rakam eksik cikiyordu. Simdi her paket sayiliyor; konumu bilinmeyenler haritada gosterilmiyor ama sayida varlar. Titresim de farkli: konum alinamadiysa cift titriyor.\n\nAyrica vardiya baslarken kapali olan bir konum saglayicisi sonradan acilirsa artik devreye giriyor; onceden vardiya boyunca yok sayiliyordu.\n\nBu surum ilk kez gercek bir telefonda (Android 9) bastan sona test edildi. Yukaridaki iki hata da o testlerde ortaya cikti."
 }
