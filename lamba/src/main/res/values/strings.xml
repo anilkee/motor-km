@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Lambam</string>
+    <string name="widget_aciklama">Tek dokunusla lambayi ac/kapat, parlakligi ayarla</string>
+    <string name="karo_adi">Lamba</string>
+</resources>
