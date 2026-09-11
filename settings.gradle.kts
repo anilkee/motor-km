@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KuryeTakip"
 include(":app")
+include(":lamba")

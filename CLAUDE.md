@@ -40,6 +40,7 @@ Harita: osmdroid (OpenStreetMap, anahtar gerekmiyor). Veritabani: duz
       ui/                  Compose ekranlari
       sync/                hesap, sunucu yedegi
     sunucu/                web panelinin kaynagi (Node, sifir bagimlilik)
+    lamba/                 AYRI uygulama: Yeelight lambasini widget'tan kontrol
 
 **Surum cesitleri (flavor):** `dogrudan` elden dagitilan APK (kendini
 gunceller), `play` Play Store icin (politika geregi kendini gunceleyemez).
@@ -67,6 +68,21 @@ sayilmaz. Depoda kalan yakit hesabi bozmasin diye boyle.
 hem de yukseltme fonksiyonuna ekle, sema surumunu artir. Bir kez sadece
 yukseltme yoluna eklendi ve sifirdan kurulumlarda sutun hic olusmadi;
 uygulama o alani yazmaya calisinca cokuyordu.
+
+## Lamba uygulamasi (`lamba/`)
+
+Kuryeyle ilgisi yok; ayni depoda cunku imza anahtari ve derleme duzeni ortak.
+Kendi `applicationId`'si (`com.seferdefteri.lamba`) ve kendi surum numarasi var;
+`version.properties`'e dokunmaz. `yayinla.ps1` bu modulu derlemez
+(`assembleDogrudanRelease` gorevi sadece kurye uygulamasinda).
+
+Lambaya once yerel agdan dogrudan baglanir (Yeelight LAN protokolu, TCP 55443,
+~50 ms); telefon mobil verideyse yerel yol hic denenmez, IFTTT Webhooks'a
+gecilir. Widget dokunulur dokunulmaz yeni durumu ciziyor, gercek cevap gelince
+uzerine yaziyor - "anlik" hissi buradan.
+
+Protokol testleri sahte ampulle calisiyor, telefon gerekmiyor:
+`sh gradlew :lamba:testDebugUnitTest`. Ayrintilar `lamba/README.md`.
 
 ## Sunucu
 

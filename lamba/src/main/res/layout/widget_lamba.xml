@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget duzeni.
+
+  Buyuk tus bilerek widget'in neredeyse tamami: yatakta karanlikta, bakmadan
+  basilacak. Parlaklik tuslari altta ve daha kucuk; yanlislikla basilmasi
+  lambayi kapatmaz, sadece kisar.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/lamba_arkaplan"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/lamba_baslik"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingBottom="4dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:text="Lamba"
+        android:textColor="#8A9199"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/lamba_ana_tus"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/lamba_tus_koyu"
+        android:gravity="center"
+        android:minHeight="56dp"
+        android:text="KAPALI"
+        android:textColor="#E8EAED"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/lamba_kis"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="5dp"
+            android:background="@drawable/lamba_tus_kucuk"
+            android:gravity="center"
+            android:text="−"
+            android:textColor="#E8EAED"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/lamba_yuzde"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="5dp"
+            android:background="@drawable/lamba_tus_kucuk"
+            android:gravity="center"
+            android:text="%50"
+            android:textColor="#8A9199"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/lamba_art"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/lamba_tus_kucuk"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#E8EAED"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
